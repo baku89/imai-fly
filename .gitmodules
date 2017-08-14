@@ -1,0 +1,3 @@
+[submodule "dragonframe-osc"]
+	path = dragonframe-osc
+	url = https://github.com/baku89/dragonframe-osc
