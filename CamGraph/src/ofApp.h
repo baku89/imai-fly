@@ -3,6 +3,7 @@
 #include "ofMain.h"
 #include "ofxGrabCam.h"
 #include "ofxOsc.h"
+#include "ofxImGui.h"
 
 class ofApp : public ofBaseApp{
 
@@ -10,6 +11,8 @@ public:
 	void setup();
 	void update();
 	void draw();
+	
+	void drawImGui();
 
 	void keyPressed(int key);
 	void keyReleased(int key);
@@ -27,4 +30,12 @@ public:
 	ofxOscReceiver		oscVt;
 	
 	ofMatrix4x4			vtRawPose;
+	ofMatrix4x4			vtCalib, dirCalib;
+	ofVec3f				calibOrigin, calibAxisX, calibAlt;
+	bool				showRawPose = false;
+	bool				trackerVisible = false;
+	
+	// gui
+	ofxImGui::Gui		gui;
+
 };

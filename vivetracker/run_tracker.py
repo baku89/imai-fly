@@ -35,9 +35,11 @@ class ViveTracker:
 			pose = self.v.devices[key].get_pose_quaternion()
 
 			# send osc
-			self.client.send_message("/vivetracker/position", [pose[0], pose[1], pose[2]])
-			#self.client.send_message("/vivetracker/euler", [pose[3], pose[4], pose[5]])
-			self.client.send_message("/vivetracker/quaternion", [pose[3], pose[4], pose[5], pose[6]])
+			x, y, z, qx, qy, qz, qw = pose
+
+			self.client.send_message("/vivetracker/position", [x, y, z])
+			self.client.send_message("/vivetracker/quaternion", [qx, qy, qz, qw])
+			self.client.send_message("/vivetracker/visible", not (x == 0 and y == 0 and z == 0))
 
 			# print
 			txt = ""
@@ -45,14 +47,13 @@ class ViveTracker:
 				txt += ("%.4f" % val) + " "
 			print("\r" + txt, end="")
 
-
 			# sleep
 			sleep_time = interval - (time.time() - start)
 			if sleep_time > 0:
 				time.sleep(sleep_time)
-def main():
 
-	
+
+def main():
 
 	if len(sys.argv) == 1:
 		interval = 1/30
