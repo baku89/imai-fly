@@ -9,6 +9,7 @@ class ofApp : public ofBaseApp{
 
 public:
 	void setup();
+	void exit();
 	void update();
 	void draw();
 	
@@ -29,10 +30,13 @@ public:
 	ofxGrabCam			cam;
 	ofxOscReceiver		oscVt;
 	
-	ofMatrix4x4			vtRawPose;
+	// settings
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
-	bool				showRawPose = false;
+	bool				showRawPose;
+	
+	// status
+	ofMatrix4x4			vtRawPose;
 	bool				trackerVisible = false;
 	
 	// gui

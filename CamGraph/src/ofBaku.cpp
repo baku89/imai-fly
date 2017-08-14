@@ -1,5 +1,6 @@
 #include "ofBaku.h"
 
+#include "ofxXmlSettings.h"
 
 void ofDrawCamera () {
 	

@@ -1,5 +1,6 @@
 #include "ofApp.h"
 
+#include "ofxAdvancedXmlSettings.h"
 #include "ofBaku.h"
 
 //--------------------------------------------------------------
@@ -21,7 +22,36 @@ void ofApp::setup(){
 	
 	// setup gui
 	gui.setup();
+	
+	// load settings
+	ofxAdvancedXmlSettings settings;
+	settings.load("settings.xml");
+	
+	showRawPose = settings.getValue("showRawPose", false);
+	
+	calibOrigin = settings.getValue("calibOrigin",	ofVec3f(0, 0, 0));
+	calibAxisX	= settings.getValue("calibAxisX",	ofVec3f(1, 0, 0));
+	calibAlt	= settings.getValue("calibAlt",		ofVec3f(0, 0, 1));
+	
+	vtCalib		= settings.getValue("vtCalib", ofMatrix4x4());
+	dirCalib	= settings.getValue("dirCalib", ofMatrix4x4());
+}
 
+//--------------------------------------------------------------
+void ofApp::exit() {
+	
+	ofxAdvancedXmlSettings settings;
+	
+	settings.setValue("showRawPose", showRawPose);
+	
+	settings.setValue("calibOrigin", calibOrigin);
+	settings.setValue("calibAxisX", calibAxisX);
+	settings.setValue("calibAlt", calibAlt);
+	
+	settings.setValue("vtCalib", vtCalib);
+	settings.setValue("dirCalib", dirCalib);
+	
+	settings.save("settings.xml");
 }
 
 //--------------------------------------------------------------
@@ -63,8 +93,6 @@ void ofApp::update(){
 		} else if (address == "/vivetracker/visible") {
 			
 			trackerVisible = m.getArgAsBool(0);
-			
-			ofLogNotice() << trackerVisible;
 		}
 	}
 }

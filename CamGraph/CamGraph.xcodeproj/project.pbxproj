@@ -100,6 +100,7 @@
 		78DD90E5D5C023DE3318C53C /* ofxXmlSettings.cpp */ = {isa = PBXFileReference; explicitFileType = sourcecode.cpp.cpp; fileEncoding = 30; name = ofxXmlSettings.cpp; path = ../../../../../../oF/v0.9.8/addons/ofxXmlSettings/src/ofxXmlSettings.cpp; sourceTree = SOURCE_ROOT; };
 		7AC54326B266A776E27972FC /* OscTypes.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = OscTypes.h; path = ../../../../../../oF/v0.9.8/addons/ofxOsc/libs/oscpack/src/osc/OscTypes.h; sourceTree = SOURCE_ROOT; };
 		7E8CAB9E25A6ACD060A22D54 /* EngineOpenGLES.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = EngineOpenGLES.h; path = ../../../../../../oF/v0.9.8/addons/ofxImGui/src/EngineOpenGLES.h; sourceTree = SOURCE_ROOT; };
+		9253389A1F4197DE0051C3A8 /* ofxAdvancedXmlSettings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ofxAdvancedXmlSettings.h; sourceTree = "<group>"; };
 		92603F02BA2D4E79AF6AFF67 /* stb_truetype.h */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.h; fileEncoding = 30; name = stb_truetype.h; path = ../../../../../../oF/v0.9.8/addons/ofxImGui/libs/imgui/src/stb_truetype.h; sourceTree = SOURCE_ROOT; };
 		92907A761F4175C1004CAC6C /* ofBaku.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ofBaku.cpp; sourceTree = "<group>"; };
 		92907A771F4175C1004CAC6C /* ofBaku.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ofBaku.h; sourceTree = "<group>"; };
@@ -374,6 +375,7 @@
 				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
 				92907A761F4175C1004CAC6C /* ofBaku.cpp */,
 				92907A771F4175C1004CAC6C /* ofBaku.h */,
+				9253389A1F4197DE0051C3A8 /* ofxAdvancedXmlSettings.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
