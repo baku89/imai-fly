@@ -10,6 +10,7 @@ void ofApp::setup(){
 	ofBackground(20, 20, 20);
 	
 	oscVt.setup(8000);
+	oscDf.setup(1234);
 	
 	cam.setFixUpDirectionEnabled(true);
 	
@@ -28,6 +29,8 @@ void ofApp::setup(){
 	settings.load("settings.xml");
 	
 	showRawPose = settings.getValue("showRawPose", false);
+	currentSceneName = settings.getValue("currentSceneName", "");
+	currentFrame = settings.getValue("currentFrame", 0);
 	
 	calibOrigin = settings.getValue("calibOrigin",	ofVec3f(0, 0, 0));
 	calibAxisX	= settings.getValue("calibAxisX",	ofVec3f(1, 0, 0));
@@ -35,6 +38,8 @@ void ofApp::setup(){
 	
 	vtCalib		= settings.getValue("vtCalib", ofMatrix4x4());
 	dirCalib	= settings.getValue("dirCalib", ofMatrix4x4());
+	
+	loadCurrentScene();
 }
 
 //--------------------------------------------------------------
@@ -43,6 +48,8 @@ void ofApp::exit() {
 	ofxAdvancedXmlSettings settings;
 	
 	settings.setValue("showRawPose", showRawPose);
+	settings.setValue("currentSceneName", currentSceneName);
+	settings.setValue("currentFrame", currentFrame);
 	
 	settings.setValue("calibOrigin", calibOrigin);
 	settings.setValue("calibAxisX", calibAxisX);
@@ -52,12 +59,15 @@ void ofApp::exit() {
 	settings.setValue("dirCalib", dirCalib);
 	
 	settings.save("settings.xml");
+	
+	saveCurrentScene();
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
 	
 	while (oscVt.hasWaitingMessages()) {
+		
 		ofxOscMessage m;
 		oscVt.getNextMessage(m);
 		
@@ -73,8 +83,6 @@ void ofApp::update(){
 			z = m.getArgAsFloat(2);
 			
 			vtRawPose.setTranslation(x, y, z);
-			
-			//obfLogNotice() << x << " " << y << " " << z;
 			
 		} else if (address == "/vivetracker/quaternion") {
 			
@@ -95,10 +103,65 @@ void ofApp::update(){
 			trackerVisible = m.getArgAsBool(0);
 		}
 	}
+	
+	while (oscDf.hasWaitingMessages()) {
+		
+		ofxOscMessage m;
+		oscDf.getNextMessage(m);
+		
+		static string address;
+		static int frame;
+		static string sceneName;
+		
+		address = m.getAddress();
+		frame = m.getArgAsInt(0);
+		sceneName = m.getArgAsString(1);
+		
+		if (address == "/dragonframe/position") {
+			
+			while (sheet.size() < frame) {
+				sheet.push_back(new Frame());
+			}
+			
+			ofLogNotice() << frame << " - resized:" << sheet.size();
+			
+			// TODO: Set currentFrame on startup somehow
+			currentFrame = frame;
+		
+		} else if (address == "/dragonframe/shoot") {
+			
+			// TODO: Support multi projects
+			currentSceneName = sceneName;
+			
+			while (sheet.size() < frame) {
+				sheet.push_back(new Frame());
+			}
+			
+			//ofLogNotice() << frame << " - resized:" << sheet.size();
+			
+			sheet[frame - 1]->pos.set(vtRawPose.getTranslation());
+			sheet[frame - 1]->empty = false;
+			
+		} else if (address == "/dragonframe/cc") {
+			
+			string filePath = m.getArgAsString(2);
+			
+			sheet[frame - 1]->hash = ofGetFileHash(filePath);
+			sheetDirPath = ofFilePath::getEnclosingDirectory(filePath, false);
+			
+			ofLogNotice() << sheetDirPath;
+			
+		} else if (address == "/dragonframe/conform") {
+			
+			sortCurrentScene();
+		}
+	}
+
+	
 }
 
 //--------------------------------------------------------------
-void ofApp::draw(){
+void ofApp::draw() {
 	
 	ofPushStyle();
 	ofEnableAlphaBlending();
@@ -109,8 +172,11 @@ void ofApp::draw(){
 	ofPushMatrix();
 	{
 		ofRotateZ(90);
-		ofSetColor(255);
-		ofDrawGridPlane(0.2f, 30.0f, true);
+		ofSetColor(64);
+		ofDrawGridPlane(0.1f, 30.0f, false);
+		
+		ofSetColor(128);
+		ofDrawGridPlane(1.0f, 3.0f, true);
 	}
 	ofPopMatrix();
 	
@@ -124,9 +190,6 @@ void ofApp::draw(){
 		// draw camera
 		ofPushMatrix(); ofMultMatrix(vtRawPose);
 		{
-		
-			
-			
 			ofPushMatrix(); ofMultMatrix(dirCalib);
 			{
 				ofDrawAxis(.2);
@@ -137,6 +200,28 @@ void ofApp::draw(){
 			ofPopMatrix();
 		}
 		ofPopMatrix();
+		
+		// draw spline
+		camSpline.clear();
+		
+		for (int i = 0; i < sheet.size(); i++) {
+			Frame *f = sheet[i];
+			
+			if (i + 1 != currentFrame && f->empty) {
+				continue;
+			}
+			
+			static ofVec3f pos;
+			
+			pos = (i + 1 == currentFrame) ? vtRawPose.getTranslation() : f->pos;
+			
+			ofDrawSphere(pos, 0.005);
+			ofDrawBitmapString(ofToString(i + 1), pos.x, pos.y + 0.01, pos.z);
+		
+			camSpline.addVertex(pos);
+		}
+		
+		camSpline.draw();
 		
 		// draw calib points
 		ofSetColor(255, 0, 255);
@@ -180,6 +265,9 @@ void ofApp::drawImGui() {
 	
 	gui.begin();
 	
+	ImGui::Text("Scene: %s", currentSceneName.c_str());
+	ImGui::Text("Current Frame: %s", ofToString(currentFrame).c_str());
+	
 	
 	if (ImGui::Checkbox("Show Raw Pose", &showRawPose));
 	
@@ -192,8 +280,6 @@ void ofApp::drawImGui() {
 	if (ImGui::Button("Set Axis X")) {
 		
 		calibAxisX = vtRawPose.getTranslation();
-		//calibAxisX = calibOrigin + (calibAxisX - calibOrigin).normalize();
-		
 		calibPtChanged = true;
 	}
 	
@@ -212,7 +298,6 @@ void ofApp::drawImGui() {
 					 0, 1, 0, 0,
 					 0, 0, 1, 0,
 					 0, 0, 0, 1);
-		
 		
 		ofVec3f axisX = (calibAxisX - calibOrigin).normalize();
 		ofVec3f axisZ = (calibAlt - calibOrigin).normalize();
@@ -247,6 +332,125 @@ void ofApp::drawImGui() {
 	}
 	
 	gui.end();
+}
+
+//--------------------------------------------------------------
+void ofApp::loadCurrentScene() {
+		
+	ofxAdvancedXmlSettings sceneSettings;
+	
+	bool exists = sceneSettings.load("scene_" + currentSceneName + ".xml");
+	
+	if (exists) {
+		
+		sheet.clear();
+		
+		sceneSettings.pushTag("sheet");
+		{
+			int numFrames = sceneSettings.getNumTags("frame");
+			
+			for (int i = 0; i < numFrames; i++) {
+				
+				sceneSettings.pushTag("frame", i);
+				
+				Frame *f = new Frame();
+				f->empty	= sceneSettings.getValue("empty",	f->empty);
+				f->pos		= sceneSettings.getValue("pos",		f->pos);
+				f->hash		= sceneSettings.getValue("hash",	f->hash);
+				sheet.push_back(f);
+				
+				sceneSettings.popTag();
+			}
+		}
+		sceneSettings.popTag();
+		
+		sheetDirPath = sceneSettings.getValue("sheetDirPath", "");
+	}
+	
+	sortCurrentScene();
+}
+
+//--------------------------------------------------------------
+void ofApp::saveCurrentScene() {
+	
+	// save Scene
+	ofxAdvancedXmlSettings sceneSettings;
+	
+	sceneSettings.addPushTag("sheet");
+	{
+		for (auto& f : sheet) {
+			
+			int i = sceneSettings.addTag("frame");
+			
+			sceneSettings.pushTag("frame", i);
+			{
+				sceneSettings.setValue("empty", f->empty);
+				sceneSettings.setValue("pos",	f->pos);
+				sceneSettings.setValue("hash",	f->hash);
+			}
+			sceneSettings.popTag();
+		}
+	}
+	sceneSettings.popTag();
+	
+	sceneSettings.setValue("sheetDirPath", sheetDirPath);
+	
+	sceneSettings.save("scene_" + currentSceneName + ".xml");
+}
+
+//--------------------------------------------------------------
+void ofApp::sortCurrentScene() {
+	
+	ofDirectory sheetDir(sheetDirPath);
+	
+	if (!sheetDir.exists()) {
+		return;
+	}
+	
+	// TODO: Add RAW extensions
+	sheetDir.allowExt("png");
+	sheetDir.allowExt("jpg");
+	sheetDir.allowExt("tiff");
+	
+	
+	sheetDir.listDir();
+	vector<ofFile> files = sheetDir.getFiles();
+	
+	// make a dict of hash with existing scene data
+	map<string, Frame*> frameMap;
+	
+	for (auto& f : sheet) {
+		if (!f->empty) {
+			frameMap[f->hash] = f;
+		}
+	}
+	
+	// assign new frame
+	sheet.clear();
+	
+	for (auto& file : files) {
+		
+		string baseName = file.getBaseName();
+		string filePath = file.getAbsolutePath();
+		
+		string seqStr	= baseName.substr(baseName.length() - 4);
+		int fnum		= ofToInt(seqStr);
+		
+		string hash		= ofGetFileHash(filePath);
+		ofLogNotice() << baseName << " -> " << fnum << " -> " << hash;
+		
+		while (sheet.size() < fnum - 1) {
+			sheet.push_back(new Frame());
+		}
+		
+		if (frameMap[hash]) {
+			sheet.push_back(frameMap[hash]);
+		} else {
+			ofLogNotice() << "sortCurrentScene(): Invalid hash found.";
+		}
+		
+		
+	}
 }
 
 //--------------------------------------------------------------

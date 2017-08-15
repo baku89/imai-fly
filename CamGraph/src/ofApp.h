@@ -5,6 +5,20 @@
 #include "ofxOsc.h"
 #include "ofxImGui.h"
 
+class Frame {
+	
+public:
+	
+	Frame() {
+		
+	}
+	
+	bool	empty = true;
+	ofVec3f pos;
+	string	hash = "";
+	string	filePath = "";
+};
+
 class ofApp : public ofBaseApp{
 
 public:
@@ -14,6 +28,10 @@ public:
 	void draw();
 	
 	void drawImGui();
+	
+	void loadCurrentScene();
+	void saveCurrentScene();
+	void sortCurrentScene();
 
 	void keyPressed(int key);
 	void keyReleased(int key);
@@ -27,19 +45,27 @@ public:
 	void dragEvent(ofDragInfo dragInfo);
 	void gotMessage(ofMessage msg);
 
+
 	ofxGrabCam			cam;
-	ofxOscReceiver		oscVt;
+	ofxOscReceiver		oscVt, oscDf;
+	
+	// data
+	vector<Frame*>		sheet;
+	string				sheetDirPath = "";
 	
 	// settings
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
 	bool				showRawPose;
+	string				currentSceneName;
+	int					currentFrame;
 	
 	// status
-	ofMatrix4x4			vtRawPose;
+	ofMatrix4x4			vtRawPose, vtPose;
 	bool				trackerVisible = false;
 	
 	// gui
 	ofxImGui::Gui		gui;
+	ofPolyline			camSpline;
 
 };

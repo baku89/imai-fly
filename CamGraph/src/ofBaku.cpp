@@ -2,6 +2,14 @@
 
 #include "ofxXmlSettings.h"
 
+string ofGetFileHash(const string& filePath) {
+	
+	string hash = ofSystem("md5 -q " + filePath);
+	hash.erase(std::remove(hash.begin(), hash.end(), '\n'), hash.end());
+	
+	return hash;
+}
+
 void ofDrawCamera () {
 	
 	static ofMesh cameraMesh;

@@ -74,6 +74,14 @@ public:
 		}
 		
 		this->popTag();
-	}
+	};
+	
+	int addPushTag(const string &tag) {
+		
+		int num = this->addTag(tag);
+		this->pushTag(tag);
+		
+		return num;
+	};
 	
 };
