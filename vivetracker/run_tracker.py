@@ -10,7 +10,7 @@ class ViveTracker:
 
 	v = None
 
-	client = udp_client.SimpleUDPClient("192.168.1.11", 8000)
+	client = udp_client.SimpleUDPClient("192.168.1.9", 8000)
 
 	def init(self):
 		try:

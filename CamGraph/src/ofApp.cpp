@@ -223,21 +223,23 @@ void ofApp::draw() {
 		ofPopMatrix();
 		
 		// draw calib points
-		ofPushMatrix(); ofMultMatrix(vtCalib);
-		{
-			ofSetColor(255, 0, 255);
-			ofDrawSphere(calibOrigin, 0.01);
-			
-			ofPushStyle();
-			ofSetColor(255, 0, 0);
-			ofSetLineWidth(5);
-			ofDrawArrow(calibOrigin, calibAxisX, 0.015);
-			ofPopStyle();
-			
-			ofSetColor(0, 255, 255);
-			ofDrawSphere(calibAlt, 0.01);
+		if (showRawPose) {
+			ofPushMatrix(); ofMultMatrix(vtCalib);
+			{
+				ofSetColor(255, 0, 255);
+				ofDrawSphere(calibOrigin, 0.01);
+				
+				ofPushStyle();
+				ofSetColor(255, 0, 0);
+				ofSetLineWidth(5);
+				ofDrawArrow(calibOrigin, calibAxisX, 0.015);
+				ofPopStyle();
+				
+				ofSetColor(0, 255, 255);
+				ofDrawSphere(calibAlt, 0.01);
+			}
+			ofPopMatrix();
 		}
-		ofPopMatrix();
 		
 		// draw spline
 		
@@ -277,7 +279,6 @@ void ofApp::draw() {
 			yawGraph.addVertex(gx, vh * (rot.y / 360.0 + 0.5));
 			pitchGraph.addVertex(gx, vh * (rot.x / 90.0 + 0.5));
 			
-			ofLogNotice() << rot.y << "\t" << rot.x;
 		}
 		
 		ofSetColor(255);
@@ -333,68 +334,76 @@ void ofApp::drawImGui() {
 	ImGui::Checkbox("Show Raw Pose", &showRawPose);
 	ImGui::Checkbox("Enable Auto Cam", &enableAutoCam);
 	
-	if (ImGui::Button("Set Origin")) {
+	
+	if (ImGui::Button("Confirm Manually")) {
 		
-		calibOrigin = vtRawPose.getTranslation();
-		calibPtChanged = true;
+		sortCurrentScene();
 	}
 	
-	if (ImGui::Button("Set Axis X")) {
+	if (ImGui::TreeNode("Calibration")) {
+	
+		if (ImGui::Button("Set Origin")) {
+			
+			calibOrigin = vtRawPose.getTranslation();
+			calibPtChanged = true;
+		}
 		
-		calibAxisX = vtRawPose.getTranslation();
-		calibPtChanged = true;
+		if (ImGui::Button("Set Axis X")) {
+			
+			calibAxisX = vtRawPose.getTranslation();
+			calibPtChanged = true;
+		}
+		
+		if (ImGui::Button("Set Alt")) {
+			
+			calibAlt = vtRawPose.getTranslation();
+			calibPtChanged = true;
+		}
+		
+		
+		static ofMatrix4x4 vtOffset;
+		
+		if (calibPtChanged) {
+			
+			// init
+			vtOffset.set(1, 0, 0, 0,
+						 0, 1, 0, 0,
+						 0, 0, 1, 0,
+						 0, 0, 0, 1);
+			
+			ofVec3f axisX = (calibAxisX - calibOrigin).normalize();
+			ofVec3f axisZ = (calibAlt - calibOrigin).normalize();
+			ofVec3f axisY = axisZ.getCrossed(axisX).normalize();
+			
+			axisZ = axisX.getCrossed(axisY).normalize();
+			
+			vtOffset._mat[0].set(axisX);
+			vtOffset._mat[1].set(axisY);
+			vtOffset._mat[2].set(axisZ);
+			
+			vtOffset.setTranslation(calibOrigin);
+			
+			vtCalib.makeInvertOf(vtOffset);
+		}
+		
+		if (ImGui::Button("Set Direction")) {
+			
+			ofMatrix4x4 vtDir, camDir, zInv;
+			
+			zInv.makeRotationMatrix(180, ofVec3f(0, 1, 0));
+			
+			vtDir.set(vtRawPose);
+			
+			camDir.makeLookAtMatrix(vtDir.getTranslation(),			// eye
+									ofVec3f(),						// center
+									-vtRawPose.getRowAsVec3f(2));	// up vector
+			
+			dirCalib = zInv * (camDir * vtDir.getInverse());
+		}
+		
+		ImGui::TreePop();
 	}
 	
-	if (ImGui::Button("Set Alt")) {
-		
-		calibAlt = vtRawPose.getTranslation();
-		calibPtChanged = true;
-	}
-	
-	
-	static ofMatrix4x4 vtOffset;
-	
-	if (calibPtChanged) {
-		
-		// init
-		vtOffset.set(1, 0, 0, 0,
-					 0, 1, 0, 0,
-					 0, 0, 1, 0,
-					 0, 0, 0, 1);
-		
-		ofVec3f axisX = (calibAxisX - calibOrigin).normalize();
-		ofVec3f axisZ = (calibAlt - calibOrigin).normalize();
-		ofVec3f axisY = axisZ.getCrossed(axisX).normalize();
-		
-		axisZ = axisX.getCrossed(axisY).normalize();
-		
-		
-		vtOffset._mat[0].set(axisX);
-		vtOffset._mat[1].set(axisY);
-		vtOffset._mat[2].set(axisZ);
-		
-		
-		vtOffset.setTranslation(calibOrigin);
-		
-		vtCalib.makeInvertOf(vtOffset);
-		
-	}
-	
-	if (ImGui::Button("Set Direction")) {
-		
-		
-		ofMatrix4x4 vtDir, camDir, zInv;
-		
-		zInv.makeRotationMatrix(180, ofVec3f(0, 1, 0));
-		
-		vtDir.set(vtRawPose);
-		
-		camDir.makeLookAtMatrix(vtDir.getTranslation(),			// eye
-								ofVec3f(),						// center
-								-vtRawPose.getRowAsVec3f(2));	// up vector
-		
-		dirCalib = zInv * (camDir * vtDir.getInverse());
-	}
 	
 	gui.end();
 }
@@ -502,7 +511,7 @@ void ofApp::sortCurrentScene() {
 		int fnum		= ofToInt(seqStr);
 		
 		string hash		= ofGetFileHash(filePath);
-		ofLogNotice() << baseName << " -> " << fnum << " -> " << hash;
+		//ofLogNotice() << baseName << " -> " << fnum << " -> " << hash;
 		
 		while (sheet.size() < fnum - 1) {
 			sheet.push_back(new Frame());
