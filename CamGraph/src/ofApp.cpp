@@ -104,7 +104,7 @@ void ofApp::update(){
 		}
 	}
 	
-	vtPose = vtRawPose * vtCalib;
+	vtPose = dirCalib * (vtRawPose * vtCalib);
 	
 	while (oscDf.hasWaitingMessages()) {
 		
@@ -142,6 +142,7 @@ void ofApp::update(){
 			//ofLogNotice() << frame << " - resized:" << sheet.size();
 			
 			sheet[frame - 1]->pos.set(vtPose.getTranslation());
+			sheet[frame - 1]->rot.set(vtPose.getRotate().getEuler());
 			sheet[frame - 1]->empty = false;
 			
 		} else if (address == "/dragonframe/cc") {
@@ -192,14 +193,8 @@ void ofApp::draw() {
 		// draw camera
 		ofPushMatrix(); ofMultMatrix(vtPose);
 		{
-			ofPushMatrix(); ofMultMatrix(dirCalib);
-			{
-				//ofDrawAxis(.2);
-				
-				ofSetColor(255);
-				ofDrawCamera();
-			}
-			ofPopMatrix();
+			ofSetColor(255);
+			ofDrawCamera();
 		}
 		ofPopMatrix();
 		
@@ -234,12 +229,21 @@ void ofApp::draw() {
 				continue;
 			}
 			
-			static ofVec3f pos;
+			static ofVec3f pos, rot;
 			
-			pos = (i + 1 == currentFrame) ? vtPose.getTranslation() : f->pos;
+			pos = (i + 1 == currentFrame) ? vtPose.getTranslation()			: f->pos;
+			rot = (i + 1 == currentFrame) ? vtPose.getRotate().getEuler()	: f->rot;
 			
-			ofDrawSphere(pos, 0.005);
-			ofDrawBitmapString(ofToString(i + 1), pos.x, pos.y + 0.01, pos.z);
+			
+			ofPushMatrix(); ofTranslate(pos);  ofRotateY(rot.y); ofRotateX(rot.x); ofRotateZ(rot.z);
+			{
+				ofDrawSphere(0, 0, 0, 0.005);
+				ofDrawBitmapString(ofToString(i + 1), 0.0, 0.01, 0.0);
+				
+				ofDrawArrow(ofVec3f(), ofVec3f(0, 0, -0.15), 0.01);
+			}
+			ofPopMatrix();
+			
 			
 			camSpline.addVertex(pos);
 		}
@@ -363,6 +367,7 @@ void ofApp::loadCurrentScene() {
 				Frame *f = new Frame();
 				f->empty	= sceneSettings.getValue("empty",	f->empty);
 				f->pos		= sceneSettings.getValue("pos",		f->pos);
+				f->rot		= sceneSettings.getValue("rot",		f->rot);
 				f->hash		= sceneSettings.getValue("hash",	f->hash);
 				sheet.push_back(f);
 				
@@ -391,6 +396,7 @@ void ofApp::saveCurrentScene() {
 			{
 				sceneSettings.setValue("empty", f->empty);
 				sceneSettings.setValue("pos",	f->pos);
+				sceneSettings.setValue("rot",	f->rot);
 				sceneSettings.setValue("hash",	f->hash);
 			}
 			sceneSettings.popTag();

@@ -49,6 +49,29 @@ public:
 		
 		return value;
 	};
+	
+	ofQuaternion getValue(const string &tag, const ofQuaternion &defaultValue) {
+		
+		ofQuaternion value(defaultValue);
+		
+		if (this->tagExists(tag)) {
+			
+			this->pushTag(tag);
+			
+			float x, y, z, w;
+			
+			x = this->getValue("x", 0.0);
+			y = this->getValue("y", 0.0);
+			z = this->getValue("z", 0.0);
+			w = this->getValue("w", 1.0);
+			
+			value.set(x, y, z, w);
+			
+			this->popTag();
+		}
+		
+		return value;
+	};
 
 	void setValue(const string &tag, const ofVec3f &value) {
 		
@@ -72,6 +95,19 @@ public:
 		for (int i = 0; i < 16; i++) {
 			this->setValue("m", m[i], i);
 		}
+		
+		this->popTag();
+	};
+	
+	void setValue(const string &tag, const ofQuaternion &value) {
+		
+		this->addTag(tag);
+		this->pushTag(tag);
+		
+		this->setValue("x", value.x());
+		this->setValue("y", value.y());
+		this->setValue("z", value.z());
+		this->setValue("w", value.w());
 		
 		this->popTag();
 	};

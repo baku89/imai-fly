@@ -13,10 +13,11 @@ public:
 		
 	}
 	
-	bool	empty = true;
-	ofVec3f pos;
-	string	hash = "";
-	string	filePath = "";
+	bool			empty = true;
+	ofVec3f			pos;
+	ofVec3f			rot;
+	string			hash = "";
+	string			filePath = "";
 };
 
 class ofApp : public ofBaseApp{
