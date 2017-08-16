@@ -58,8 +58,10 @@ public:
 	// settings
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
+    int                 numSampleFrames;
 	bool				showRawPose;
 	bool				enableAutoCam;
+    float               autoCamDistance;
 	string				currentSceneName;
 	int					currentFrame;
 	

@@ -28,10 +28,12 @@ void ofApp::setup(){
 	ofxAdvancedXmlSettings settings;
 	settings.load("settings.xml");
 	
-	enableAutoCam = settings.getValue("enableAutoCam", false);
-	showRawPose = settings.getValue("showRawPose", false);
+	enableAutoCam    = settings.getValue("enableAutoCam", false);
+    autoCamDistance  = settings.getValue("autoCamDistance", 1.0);
+    numSampleFrames  = settings.getValue("numSampleFrames", 10);
+	showRawPose      = settings.getValue("showRawPose", false);
 	currentSceneName = settings.getValue("currentSceneName", "");
-	currentFrame = settings.getValue("currentFrame", 0);
+	currentFrame     = settings.getValue("currentFrame", 0);
 	
 	calibOrigin = settings.getValue("calibOrigin",	ofVec3f(0, 0, 0));
 	calibAxisX	= settings.getValue("calibAxisX",	ofVec3f(1, 0, 0));
@@ -49,6 +51,8 @@ void ofApp::exit() {
 	ofxAdvancedXmlSettings settings;
 	
 	settings.setValue("enableAutoCam", enableAutoCam);
+    settings.setValue("autoCamDistance", autoCamDistance);
+    settings.setValue("numSampleFrames", numSampleFrames);
 	settings.setValue("showRawPose", showRawPose);
 	settings.setValue("currentSceneName", currentSceneName);
 	settings.setValue("currentFrame", currentFrame);
@@ -67,6 +71,10 @@ void ofApp::exit() {
 
 //--------------------------------------------------------------
 void ofApp::update(){
+    
+    while (sheet.size() < currentFrame) {
+        sheet.push_back(new Frame());
+    }
 	
 	while (oscVt.hasWaitingMessages()) {
 		
@@ -85,7 +93,7 @@ void ofApp::update(){
 			z = m.getArgAsFloat(2);
 			
 			vtRawPose.setTranslation(x, y, z);
-			
+            
 		} else if (address == "/vivetracker/quaternion") {
 			
 			static ofQuaternion quat;
@@ -97,7 +105,6 @@ void ofApp::update(){
 			z = m.getArgAsFloat(3);
 			
 			quat.set(x, y, z, w);
-			
 			vtRawPose.setRotate(quat);
 		
 		} else if (address == "/vivetracker/visible") {
@@ -107,6 +114,9 @@ void ofApp::update(){
 	}
 	
 	vtPose = dirCalib * (vtRawPose * vtCalib);
+    
+    sheet[currentFrame - 1]->pos = vtPose.getTranslation();
+    sheet[currentFrame - 1]->rot = vtPose.getRotate().getEuler();
 	
 	while (oscDf.hasWaitingMessages()) {
 		
@@ -161,39 +171,40 @@ void ofApp::update(){
 			sortCurrentScene();
 		}
 	}
-
-	
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
 	
-	static ofPolyline camSpline, yawGraph, pitchGraph;
+	static ofPolyline camSpline, yawGraph, pitchGraph, yGraph;
+    
+    // calc prev frame number
+    static int prevFrame;
+
+    for (int i = currentFrame - 2; i >= 0; i--) {
+        
+        if (!sheet[i]->empty) {
+            prevFrame = i;
+            break;
+        }
+    }
 	
 	ofPushStyle();
 	ofEnableAlphaBlending();
 	
 	if (enableAutoCam) {
 		
-		// get prev
-		/*
-		ofMatrix4x4 prevCoord = vtPose;
-		
-		for (int i = currentFrame - 2; i >= 0; i--) {
-			
-			Frame *f;
-			
-			if (!f->empty) {
-				prevCoord.setTranslation(f->pos);
-				break;
-			}
-		}
-		 */
-		
-		autoCam.begin();
-	} else {
-		grabCam.begin();
-	}
+		// get prev position
+        static ofVec3f      prevPos;
+        prevPos = sheet[prevFrame - 1]->pos;
+        
+        static ofVec3f rp; // relative position from prevPos
+        rp = grabCam.getGlobalTransformMatrix().getRotate() * ofVec3f(0, 0, autoCamDistance);
+        
+        grabCam.setPosition(prevPos + rp);
+        grabCam.begin();
+        
+    }
 	
 	ofDisableDepthTest();
 	ofPushMatrix();
@@ -246,8 +257,38 @@ void ofApp::draw() {
 		camSpline.clear();
 		yawGraph.clear();
 		pitchGraph.clear();
-		
+        
+        // calc scale of each graphs
+        static float prevYaw, prevPitch, yawScale, pitchScale;
+        
+        prevYaw = sheet[prevFrame - 1]->rot.y;
+        prevPitch = sheet[prevFrame - 1]->rot.x;
+        
+        yawScale = 10.0;
+        pitchScale = 10.0;
+        
+        static int numFrames;
+        numFrames = 0;
+        
+        for (int i = currentFrame - 1; i >= 0; i--) {
+            Frame *f = sheet[i];
+            
+            if (!f->empty) {
+                yawScale = max(yawScale, abs(f->rot.y - prevYaw) * 2);
+                pitchScale = max(pitchScale, abs(f->rot.x - prevPitch) * 2);
+            }
+            
+            if (++numFrames == numSampleFrames) {
+                break;
+            }
+        }
+        
+        yawScale += 5.0;
+        pitchScale += 5.0;
+        
 		ofSetColor(255);
+        
+        float gxStep = (float)ofGetWidth() / numSampleFrames;
 		
 		for (int i = 0; i < sheet.size(); i++) {
 			Frame *f = sheet[i];
@@ -258,26 +299,33 @@ void ofApp::draw() {
 			
 			static ofVec3f pos, rot;
 			
-			pos = (i + 1 == currentFrame) ? vtPose.getTranslation()			: f->pos;
-			rot = (i + 1 == currentFrame) ? vtPose.getRotate().getEuler()	: f->rot;
+			pos = f->pos;
+			rot = f->rot;
 			
 			
 			ofPushMatrix(); ofTranslate(pos);  ofRotateY(rot.y); ofRotateX(rot.x); ofRotateZ(rot.z);
 			{
+                ofSetColor(255);
 				ofDrawSphere(0, 0, 0, 0.005);
-				ofDrawBitmapString(ofToString(i + 1), 0.0, 0.01, 0.0);
-				
-				ofDrawArrow(ofVec3f(), ofVec3f(0, 0, 0.15), 0.01);
+                
+                ofSetColor(150);
+                
+                ofDrawBitmapString(ofToString(i + 1), 0.0, 0.01, 0.0);
+                ofDrawLine(ofVec3f(), ofVec3f(0, 0, 0.15));
 			}
 			ofPopMatrix();
 			
 			camSpline.addVertex(pos);
 			
 			// add graph
-			float gx = (float)ofGetWidth() / sheet.size() * i;
+            float gx = gxStep * (i - (currentFrame - numSampleFrames));
 			float vh = ofGetHeight();
-			yawGraph.addVertex(gx, vh * (rot.y / 360.0 + 0.5));
-			pitchGraph.addVertex(gx, vh * (rot.x / 90.0 + 0.5));
+            
+            float yawY = 1.0 - ((f->rot.y - prevYaw) / yawScale + 0.5);
+            float pitchY = 1.0 - ((f->rot.x - prevPitch) / pitchScale + 0.5);
+            
+			yawGraph.addVertex(gx, vh * yawY);
+			pitchGraph.addVertex(gx, vh * pitchY);
 			
 		}
 		
@@ -287,11 +335,11 @@ void ofApp::draw() {
 	}
 	if (showRawPose) { ofPopMatrix(); }
 	
-	if (enableAutoCam) {
-		autoCam.end();
-	} else {
-		grabCam.end();
-	}
+    if (enableAutoCam) {
+        grabCam.end();
+    } else {
+        grabCam.end();
+    }
 	
 	ofSetColor(0, 255, 0);
 	yawGraph.draw();
@@ -304,7 +352,6 @@ void ofApp::draw() {
 	for (auto& pt : pitchGraph.getVertices()) {
 		ofDrawCircle(pt, 4);
 	}
-
 	
 	// visible?
 	if (!trackerVisible) {
@@ -332,7 +379,17 @@ void ofApp::drawImGui() {
 	
 	
 	ImGui::Checkbox("Show Raw Pose", &showRawPose);
-	ImGui::Checkbox("Enable Auto Cam", &enableAutoCam);
+    
+    if (ImGui::Checkbox("Enable Auto Cam", &enableAutoCam)) {
+        if (!enableAutoCam) {
+            ofLogNotice() << "Disabled auto cam";
+            grabCam.setTransformMatrix(autoCam.getGlobalTransformMatrix());
+        }
+    }
+    
+    ImGui::SliderFloat("Auto Cam Distance", &autoCamDistance, 0.1, 2.0);
+    
+    ImGui::SliderInt("Sample Frames", &numSampleFrames, 1, 60);
 	
 	
 	if (ImGui::Button("Confirm Manually")) {
