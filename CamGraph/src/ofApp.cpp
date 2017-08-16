@@ -215,7 +215,7 @@ void ofApp::draw() {
 	{
 		
 		// draw camera
-		ofPushMatrix(); ofMultMatrix(vtPose);
+		ofPushMatrix(); ofMultMatrix(vtPose); ofScale(1, 1, -1);
 		{
 			ofSetColor(255);
 			ofDrawCamera();
@@ -265,7 +265,7 @@ void ofApp::draw() {
 				ofDrawSphere(0, 0, 0, 0.005);
 				ofDrawBitmapString(ofToString(i + 1), 0.0, 0.01, 0.0);
 				
-				ofDrawArrow(ofVec3f(), ofVec3f(0, 0, -0.15), 0.01);
+				ofDrawArrow(ofVec3f(), ofVec3f(0, 0, 0.15), 0.01);
 			}
 			ofPopMatrix();
 			
@@ -382,16 +382,18 @@ void ofApp::drawImGui() {
 	
 	if (ImGui::Button("Set Direction")) {
 		
-		ofMatrix4x4 vtDir, camDir;
-		ofVec4f up4 = -vtRawPose._mat[2];
+		
+		ofMatrix4x4 vtDir, camDir, zInv;
+		
+		zInv.makeRotationMatrix(180, ofVec3f(0, 1, 0));
 		
 		vtDir.set(vtRawPose);
 		
 		camDir.makeLookAtMatrix(vtDir.getTranslation(),			// eye
 								ofVec3f(),						// center
-								ofVec3f(up4.x, up4.y, up4.z));	// up vector
+								-vtRawPose.getRowAsVec3f(2));	// up vector
 		
-		dirCalib = camDir * vtDir.getInverse();
+		dirCalib = zInv * (camDir * vtDir.getInverse());
 	}
 	
 	gui.end();
