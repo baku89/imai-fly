@@ -47,7 +47,8 @@ public:
 	void gotMessage(ofMessage msg);
 
 
-	ofxGrabCam			cam;
+	ofCamera			autoCam;
+	ofxGrabCam			grabCam;
 	ofxOscReceiver		oscVt, oscDf;
 	
 	// data
@@ -58,6 +59,7 @@ public:
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
 	bool				showRawPose;
+	bool				enableAutoCam;
 	string				currentSceneName;
 	int					currentFrame;
 	
@@ -67,6 +69,5 @@ public:
 	
 	// gui
 	ofxImGui::Gui		gui;
-	ofPolyline			camSpline;
 
 };
