@@ -5,20 +5,7 @@
 #include "ofxOsc.h"
 #include "ofxImGui.h"
 
-class Frame {
-	
-public:
-	
-	Frame() {
-		
-	}
-	
-	bool			empty = true;
-	ofVec3f			pos;
-	ofVec3f			rot;
-	string			hash = "";
-	string			filePath = "";
-};
+#include "Scene.h"
 
 class ofApp : public ofBaseApp{
 
@@ -29,10 +16,6 @@ public:
 	void draw();
 	
 	void drawImGui();
-	
-	void loadCurrentScene();
-	void saveCurrentScene();
-	void sortCurrentScene();
 
 	void keyPressed(int key);
 	void keyReleased(int key);
@@ -52,17 +35,16 @@ public:
 	ofxOscReceiver		oscVt, oscDf;
 	
 	// data
-	vector<Frame*>		sheet;
-	string				sheetDirPath = "";
+    Scene               scene;
 	
 	// settings
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
     int                 numSampleFrames;
+    bool                windowOnTop;
 	bool				showRawPose;
 	bool				enableAutoCam;
     float               autoCamDistance;
-	string				currentSceneName;
 	int					currentFrame;
 	
 	// status

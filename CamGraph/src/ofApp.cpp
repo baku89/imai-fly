@@ -3,6 +3,8 @@
 #include "ofxAdvancedXmlSettings.h"
 #include "ofBaku.h"
 
+#include "WindowUtils.h"
+
 //--------------------------------------------------------------
 void ofApp::setup(){
 	
@@ -27,13 +29,16 @@ void ofApp::setup(){
 	// load settings
 	ofxAdvancedXmlSettings settings;
 	settings.load("settings.xml");
+    
+    string currentSceneName;
 	
 	enableAutoCam    = settings.getValue("enableAutoCam", false);
     autoCamDistance  = settings.getValue("autoCamDistance", 1.0);
     numSampleFrames  = settings.getValue("numSampleFrames", 10);
+    windowOnTop      = settings.getValue("windowOnTop", true);
 	showRawPose      = settings.getValue("showRawPose", false);
-	currentSceneName = settings.getValue("currentSceneName", "");
-	currentFrame     = settings.getValue("currentFrame", 0);
+    currentFrame     = settings.getValue("currentFrame", 0);
+    currentSceneName = settings.getValue("currentSceneName", "");
 	
 	calibOrigin = settings.getValue("calibOrigin",	ofVec3f(0, 0, 0));
 	calibAxisX	= settings.getValue("calibAxisX",	ofVec3f(1, 0, 0));
@@ -41,8 +46,12 @@ void ofApp::setup(){
 	
 	vtCalib		= settings.getValue("vtCalib", ofMatrix4x4());
 	dirCalib	= settings.getValue("dirCalib", ofMatrix4x4());
+    
+    
+    WindowUtils::setTitlebarTransparent(true);
+    WindowUtils::setWindowOnTop(windowOnTop);
 	
-	loadCurrentScene();
+    scene.load(currentSceneName);
 }
 
 //--------------------------------------------------------------
@@ -53,8 +62,9 @@ void ofApp::exit() {
 	settings.setValue("enableAutoCam", enableAutoCam);
     settings.setValue("autoCamDistance", autoCamDistance);
     settings.setValue("numSampleFrames", numSampleFrames);
+    settings.setValue("windowOnTop", windowOnTop);
 	settings.setValue("showRawPose", showRawPose);
-	settings.setValue("currentSceneName", currentSceneName);
+	settings.setValue("currentSceneName", scene.getName());
 	settings.setValue("currentFrame", currentFrame);
 	
 	settings.setValue("calibOrigin", calibOrigin);
@@ -66,15 +76,13 @@ void ofApp::exit() {
 	
 	settings.save("settings.xml");
 	
-	saveCurrentScene();
+    scene.save();
 }
 
 //--------------------------------------------------------------
 void ofApp::update(){
     
-    while (sheet.size() < currentFrame) {
-        sheet.push_back(new Frame());
-    }
+    scene.setDuration(currentFrame);
 	
 	while (oscVt.hasWaitingMessages()) {
 		
@@ -115,8 +123,10 @@ void ofApp::update(){
 	
 	vtPose = dirCalib * (vtRawPose * vtCalib);
     
-    sheet[currentFrame - 1]->pos = vtPose.getTranslation();
-    sheet[currentFrame - 1]->rot = vtPose.getRotate().getEuler();
+    FrameData *fd = scene.get(currentFrame);
+    fd->pos = vtPose.getTranslation();
+    fd->rot = vtPose.getRotate().getEuler();
+    fd->empty = false;
 	
 	while (oscDf.hasWaitingMessages()) {
 		
@@ -130,45 +140,38 @@ void ofApp::update(){
 		address = m.getAddress();
 		frame = m.getArgAsInt(0);
 		sceneName = m.getArgAsString(1);
+        
+        scene.setDuration(frame);
 		
 		if (address == "/dragonframe/position") {
-			
-			while (sheet.size() < frame) {
-				sheet.push_back(new Frame());
-			}
-			
-			ofLogNotice() << frame << " - resized:" << sheet.size();
 			
 			// TODO: Set currentFrame on startup somehow
 			currentFrame = frame;
 		
 		} else if (address == "/dragonframe/shoot") {
 			
-			// TODO: Support multi projects
-			currentSceneName = sceneName;
+            // TODO: Fix some issue
+            if (scene.getName() != sceneName) {
+                scene.save();
+                scene.load(sceneName);
+            }
 			
-			while (sheet.size() < frame) {
-				sheet.push_back(new Frame());
-			}
-			
-			//ofLogNotice() << frame << " - resized:" << sheet.size();
-			
-			sheet[frame - 1]->pos.set(vtPose.getTranslation());
-			sheet[frame - 1]->rot.set(vtPose.getRotate().getEuler());
-			sheet[frame - 1]->empty = false;
+            FrameData *fd = scene.get(frame);
+			fd->pos.set(vtPose.getTranslation());
+			fd->rot.set(vtPose.getRotate().getEuler());
+			fd->empty = false;
 			
 		} else if (address == "/dragonframe/cc") {
 			
 			string filePath = m.getArgAsString(2);
+            string dirPath = ofFilePath::getEnclosingDirectory(filePath, false);
 			
-			sheet[frame - 1]->hash = ofGetFileHash(filePath);
-			sheetDirPath = ofFilePath::getEnclosingDirectory(filePath, false);
-			
-			ofLogNotice() << sheetDirPath;
+			scene.get(frame)->hash = ofGetFileHash(filePath);
+            scene.setDirPath(dirPath);
 			
 		} else if (address == "/dragonframe/conform") {
 			
-			sortCurrentScene();
+            scene.confirm();
 		}
 	}
 }
@@ -178,13 +181,14 @@ void ofApp::draw() {
 	
 	static ofPolyline camSpline, yawGraph, pitchGraph, yGraph;
     
-    // calc prev frame number
-    static int prevFrame;
-
-    for (int i = currentFrame - 2; i >= 0; i--) {
-        
-        if (!sheet[i]->empty) {
-            prevFrame = i;
+    // get prev frame data
+    static FrameData* prevFd;
+    
+    prevFd = scene.get(currentFrame);
+    
+    for (int f = currentFrame - 1; f >= 1; f--) {
+        if (!scene.get(f)->empty) {
+            prevFd = scene.get(f);
             break;
         }
     }
@@ -196,7 +200,7 @@ void ofApp::draw() {
 		
 		// get prev position
         static ofVec3f      prevPos;
-        prevPos = sheet[prevFrame - 1]->pos;
+        prevPos = prevFd->pos;
         
         static ofVec3f rp; // relative position from prevPos
         rp = grabCam.getGlobalTransformMatrix().getRotate() * ofVec3f(0, 0, autoCamDistance);
@@ -261,8 +265,8 @@ void ofApp::draw() {
         // calc scale of each graphs
         static float prevYaw, prevPitch, yawScale, pitchScale;
         
-        prevYaw = sheet[prevFrame - 1]->rot.y;
-        prevPitch = sheet[prevFrame - 1]->rot.x;
+        prevYaw = prevFd->rot.y;
+        prevPitch = prevFd->rot.x;
         
         yawScale = 10.0;
         pitchScale = 10.0;
@@ -270,12 +274,12 @@ void ofApp::draw() {
         static int numFrames;
         numFrames = 0;
         
-        for (int i = currentFrame - 1; i >= 0; i--) {
-            Frame *f = sheet[i];
+        for (int f = currentFrame - 1; f >= 1; f--) {
+            FrameData *fd = scene.get(f);
             
-            if (!f->empty) {
-                yawScale = max(yawScale, abs(f->rot.y - prevYaw) * 2);
-                pitchScale = max(pitchScale, abs(f->rot.x - prevPitch) * 2);
+            if (!fd->empty) {
+                yawScale = max(yawScale, abs(fd->yaw() - prevYaw) * 2);
+                pitchScale = max(pitchScale, abs(fd->pitch() - prevPitch) * 2);
             }
             
             if (++numFrames == numSampleFrames) {
@@ -288,41 +292,36 @@ void ofApp::draw() {
         
 		ofSetColor(255);
         
-        float gxStep = (float)ofGetWidth() / numSampleFrames;
+        float gxStep = (float)ofGetWidth() / (numSampleFrames + 1);
 		
-		for (int i = 0; i < sheet.size(); i++) {
-			Frame *f = sheet[i];
+		for (int f = 1; f <= scene.getDuration(); f++) {
+			FrameData *fd = scene.get(f);
 			
-			if (i + 1 != currentFrame && f->empty) {
+			if (fd->empty) {
 				continue;
 			}
 			
-			static ofVec3f pos, rot;
-			
-			pos = f->pos;
-			rot = f->rot;
-			
-			
-			ofPushMatrix(); ofTranslate(pos);  ofRotateY(rot.y); ofRotateX(rot.x); ofRotateZ(rot.z);
+			ofPushMatrix(); ofTranslate(fd->pos);
+            ofRotateY(fd->rot.y); ofRotateX(fd->rot.x); ofRotateZ(fd->rot.z);
 			{
                 ofSetColor(255);
 				ofDrawSphere(0, 0, 0, 0.005);
                 
                 ofSetColor(150);
                 
-                ofDrawBitmapString(ofToString(i + 1), 0.0, 0.01, 0.0);
+                ofDrawBitmapString(ofToString(f), 0.0, 0.01, 0.0);
                 ofDrawLine(ofVec3f(), ofVec3f(0, 0, 0.15));
 			}
 			ofPopMatrix();
 			
-			camSpline.addVertex(pos);
+			camSpline.addVertex(fd->pos);
 			
 			// add graph
-            float gx = gxStep * (i - (currentFrame - numSampleFrames));
+            float gx = gxStep * (f - (currentFrame - numSampleFrames));
 			float vh = ofGetHeight();
             
-            float yawY = 1.0 - ((f->rot.y - prevYaw) / yawScale + 0.5);
-            float pitchY = 1.0 - ((f->rot.x - prevPitch) / pitchScale + 0.5);
+            float yawY = 1.0 - ((fd->yaw() - prevYaw) / yawScale + 0.5);
+            float pitchY = 1.0 - ((fd->pitch() - prevPitch) / pitchScale + 0.5);
             
 			yawGraph.addVertex(gx, vh * yawY);
 			pitchGraph.addVertex(gx, vh * pitchY);
@@ -374,9 +373,13 @@ void ofApp::drawImGui() {
 	
 	gui.begin();
 	
-	ImGui::Text("Scene: %s", currentSceneName.c_str());
+	ImGui::Text("Scene: %s", scene.getName().c_str());
 	ImGui::Text("Current Frame: %s", ofToString(currentFrame).c_str());
 	
+    if (ImGui::Checkbox("Window on Top", &windowOnTop)) {
+        WindowUtils::setWindowOnTop(windowOnTop);
+        
+    }
 	
 	ImGui::Checkbox("Show Raw Pose", &showRawPose);
     
@@ -394,7 +397,7 @@ void ofApp::drawImGui() {
 	
 	if (ImGui::Button("Confirm Manually")) {
 		
-		sortCurrentScene();
+        scene.confirm();
 	}
 	
 	if (ImGui::TreeNode("Calibration")) {
@@ -466,125 +469,6 @@ void ofApp::drawImGui() {
 }
 
 //--------------------------------------------------------------
-void ofApp::loadCurrentScene() {
-		
-	ofxAdvancedXmlSettings sceneSettings;
-	
-	bool exists = sceneSettings.load("scene_" + currentSceneName + ".xml");
-	
-	if (exists) {
-		
-		sheet.clear();
-		
-		sceneSettings.pushTag("sheet");
-		{
-			int numFrames = sceneSettings.getNumTags("frame");
-			
-			for (int i = 0; i < numFrames; i++) {
-				
-				sceneSettings.pushTag("frame", i);
-				
-				Frame *f = new Frame();
-				f->empty	= sceneSettings.getValue("empty",	f->empty);
-				f->pos		= sceneSettings.getValue("pos",		f->pos);
-				f->rot		= sceneSettings.getValue("rot",		f->rot);
-				f->hash		= sceneSettings.getValue("hash",	f->hash);
-				sheet.push_back(f);
-				
-				sceneSettings.popTag();
-			}
-		}
-		sceneSettings.popTag();
-		
-		sheetDirPath = sceneSettings.getValue("sheetDirPath", "");
-	}
-}
-
-//--------------------------------------------------------------
-void ofApp::saveCurrentScene() {
-	
-	// save Scene
-	ofxAdvancedXmlSettings sceneSettings;
-	
-	sceneSettings.addPushTag("sheet");
-	{
-		for (auto& f : sheet) {
-			
-			int i = sceneSettings.addTag("frame");
-			
-			sceneSettings.pushTag("frame", i);
-			{
-				sceneSettings.setValue("empty", f->empty);
-				sceneSettings.setValue("pos",	f->pos);
-				sceneSettings.setValue("rot",	f->rot);
-				sceneSettings.setValue("hash",	f->hash);
-			}
-			sceneSettings.popTag();
-		}
-	}
-	sceneSettings.popTag();
-	
-	sceneSettings.setValue("sheetDirPath", sheetDirPath);
-	
-	sceneSettings.save("scene_" + currentSceneName + ".xml");
-}
-
-//--------------------------------------------------------------
-void ofApp::sortCurrentScene() {
-	
-	ofDirectory sheetDir(sheetDirPath);
-	
-	if (!sheetDir.exists()) {
-		return;
-	}
-	
-	// TODO: Add RAW extensions
-	sheetDir.allowExt("png");
-	sheetDir.allowExt("jpg");
-	sheetDir.allowExt("tiff");
-	
-	
-	sheetDir.listDir();
-	vector<ofFile> files = sheetDir.getFiles();
-	
-	// make a dict of hash with existing scene data
-	map<string, Frame*> frameMap;
-	
-	for (auto& f : sheet) {
-		if (!f->empty) {
-			frameMap[f->hash] = f;
-		}
-	}
-	
-	// assign new frame
-	sheet.clear();
-	
-	for (auto& file : files) {
-		
-		string baseName = file.getBaseName();
-		string filePath = file.getAbsolutePath();
-		
-		string seqStr	= baseName.substr(baseName.length() - 4);
-		int fnum		= ofToInt(seqStr);
-		
-		string hash		= ofGetFileHash(filePath);
-		//ofLogNotice() << baseName << " -> " << fnum << " -> " << hash;
-		
-		while (sheet.size() < fnum - 1) {
-			sheet.push_back(new Frame());
-		}
-		
-		if (frameMap[hash]) {
-			sheet.push_back(frameMap[hash]);
-		} else {
-			ofLogNotice() << "sortCurrentScene(): Invalid hash found.";
-		}
-		
-		
-	}
-}
-
-//--------------------------------------------------------------
 void ofApp::keyPressed(int key){
 
 }
@@ -606,7 +490,9 @@ void ofApp::mouseDragged(int x, int y, int button){
 
 //--------------------------------------------------------------
 void ofApp::mousePressed(int x, int y, int button){
-
+    
+    bool guiCaptured = ImGui::GetIO().WantCaptureMouse;
+    grabCam.setMouseActionsEnabled(!guiCaptured);
 }
 
 //--------------------------------------------------------------
