@@ -104,6 +104,8 @@ void ofApp::update(){
 		}
 	}
 	
+	vtPose = vtRawPose * vtCalib;
+	
 	while (oscDf.hasWaitingMessages()) {
 		
 		ofxOscMessage m;
@@ -139,7 +141,7 @@ void ofApp::update(){
 			
 			//ofLogNotice() << frame << " - resized:" << sheet.size();
 			
-			sheet[frame - 1]->pos.set(vtRawPose.getTranslation());
+			sheet[frame - 1]->pos.set(vtPose.getTranslation());
 			sheet[frame - 1]->empty = false;
 			
 		} else if (address == "/dragonframe/cc") {
@@ -184,15 +186,15 @@ void ofApp::draw() {
 	ofDrawAxis(1.0f);
 	ofEnableDepthTest();
 	
-	if (!showRawPose) { ofPushMatrix(); ofMultMatrix(vtCalib); }
+	if (showRawPose) { ofPushMatrix(); ofMultMatrix(vtCalib.getInverse()); }
 	{
 		
 		// draw camera
-		ofPushMatrix(); ofMultMatrix(vtRawPose);
+		ofPushMatrix(); ofMultMatrix(vtPose);
 		{
 			ofPushMatrix(); ofMultMatrix(dirCalib);
 			{
-				ofDrawAxis(.2);
+				//ofDrawAxis(.2);
 				
 				ofSetColor(255);
 				ofDrawCamera();
@@ -201,8 +203,29 @@ void ofApp::draw() {
 		}
 		ofPopMatrix();
 		
+		// draw calib points
+		ofPushMatrix(); ofMultMatrix(vtCalib);
+		{
+			ofSetColor(255, 0, 255);
+			ofDrawSphere(calibOrigin, 0.01);
+			
+			ofPushStyle();
+			ofSetColor(255, 0, 0);
+			ofSetLineWidth(5);
+			ofDrawArrow(calibOrigin, calibAxisX, 0.015);
+			ofPopStyle();
+			
+			ofSetColor(0, 255, 255);
+			ofDrawSphere(calibAlt, 0.01);
+		}
+		ofPopMatrix();
+		
+		
+		
 		// draw spline
 		camSpline.clear();
+		
+		ofSetColor(255);
 		
 		for (int i = 0; i < sheet.size(); i++) {
 			Frame *f = sheet[i];
@@ -213,36 +236,20 @@ void ofApp::draw() {
 			
 			static ofVec3f pos;
 			
-			pos = (i + 1 == currentFrame) ? vtRawPose.getTranslation() : f->pos;
+			pos = (i + 1 == currentFrame) ? vtPose.getTranslation() : f->pos;
 			
 			ofDrawSphere(pos, 0.005);
 			ofDrawBitmapString(ofToString(i + 1), pos.x, pos.y + 0.01, pos.z);
-		
+			
 			camSpline.addVertex(pos);
 		}
 		
 		camSpline.draw();
 		
-		// draw calib points
-		ofSetColor(255, 0, 255);
-		ofDrawSphere(calibOrigin, 0.01);
-		
-		ofPushStyle();
-		ofSetColor(255, 0, 0);
-		ofSetLineWidth(5);
-		ofDrawArrow(calibOrigin, calibAxisX, 0.015);
-		ofPopStyle();
-		
-		
-		ofSetColor(0, 255, 255);
-		ofDrawSphere(calibAlt, 0.01);
-
+		cam.end();
 		
 	}
-	if (!showRawPose) { ofPopMatrix(); }
-	
-	cam.end();
-	
+	if (showRawPose) { ofPopMatrix(); }
 	
 	// visible?
 	if (!trackerVisible) {
@@ -366,8 +373,6 @@ void ofApp::loadCurrentScene() {
 		
 		sheetDirPath = sceneSettings.getValue("sheetDirPath", "");
 	}
-	
-	sortCurrentScene();
 }
 
 //--------------------------------------------------------------
