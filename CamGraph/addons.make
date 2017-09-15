@@ -1,3 +1,4 @@
+ofxAdvancedXmlSettings
 ofxGrabCam
 ofxImGui
 ofxOsc

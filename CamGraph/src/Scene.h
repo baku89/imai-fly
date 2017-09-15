@@ -10,6 +10,7 @@ public:
     bool			empty = true;
     ofVec3f			pos;
     ofVec3f			rot;
+    float           speed = 0;
     string			hash = "";
     string			filePath = "";
     
@@ -34,7 +35,6 @@ public:
     }
     
     void setDuration(size_t duration) {
-        ofLogNotice() << duration;
         while (data.size() < duration) {
             data.push_back(new FrameData());
         }
@@ -45,7 +45,21 @@ public:
     }
     
     FrameData* get(int frame) {
-        return data[frame - 1];
+        return data[frame];
+    }
+    
+    FrameData* getPrev(int frame) {
+        
+        FrameData *prevFd = data[frame];
+        
+        for (int i = frame - 1; i >= 0; i--) {
+            if (!data[i]->empty) {
+                prevFd = data[i];
+                break;
+            }
+        }
+        
+        return prevFd;
     }
     
     void load(const string &_name) {
@@ -55,10 +69,9 @@ public:
         
         ofxAdvancedXmlSettings sceneSettings;
         
-        bool exists = sceneSettings.load("scene_" + name + ".xml");
-        
         data.clear();
         
+        bool exists = sceneSettings.load("scenes/scene_" + name + ".xml");
         
         if (exists) {
             
@@ -75,8 +88,8 @@ public:
                     fd->empty	= sceneSettings.getValue("empty",	fd->empty);
                     fd->pos		= sceneSettings.getValue("pos",		fd->pos);
                     fd->rot		= sceneSettings.getValue("rot",		fd->rot);
+                    fd->speed   = sceneSettings.getValue("speed",   fd->speed);
                     fd->hash	= sceneSettings.getValue("hash",	fd->hash);
-                    data.push_back(fd);
                     
                     sceneSettings.popTag();
                 }
@@ -103,6 +116,7 @@ public:
                     sceneSettings.setValue("empty", fd->empty);
                     sceneSettings.setValue("pos",	fd->pos);
                     sceneSettings.setValue("rot",	fd->rot);
+                    sceneSettings.setValue("speed",	fd->speed);
                     sceneSettings.setValue("hash",	fd->hash);
                 }
                 sceneSettings.popTag();
@@ -112,7 +126,7 @@ public:
         
         sceneSettings.setValue("dirPath", dirPath);
         
-        sceneSettings.save("scene_" + name + ".xml");
+        sceneSettings.save("scenes/scene_" + name + ".xml");
     }
     
     void confirm() {
@@ -163,6 +177,15 @@ public:
             } else {
                 ofLogNotice() << "sortCurrentScene(): Invalid hash found.";
             }
+        }
+        
+        // calc speed
+        ofVec3f prevPos = data[0]->pos;
+        
+        for (auto& fd : data) {
+            
+            fd->speed = (fd->pos - prevPos).length();
+            prevPos = fd->pos;
         }
     }
     

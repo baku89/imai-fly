@@ -1,8 +1,5 @@
 #include "ofBaku.h"
 
-#include "ofxXmlSettings.h"
-
-
 string ofGetFileHash(const string& filePath) {
 	
 	string hash = ofSystem("md5 -q " + filePath);
@@ -75,6 +72,4 @@ void ofDrawCamera () {
 	ofScale(0.0015, 0.0015, 0.0015);
 	cameraMesh.draw();
 	ofPopMatrix();
-	
-	
 }

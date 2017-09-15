@@ -6,6 +6,7 @@
 #include "ofxImGui.h"
 
 #include "Scene.h"
+#include "Graph.h"
 
 class ofApp : public ofBaseApp{
 
@@ -30,9 +31,9 @@ public:
 	void gotMessage(ofMessage msg);
 
 
-	ofCamera			autoCam;
 	ofxGrabCam			grabCam;
 	ofxOscReceiver		oscVt, oscDf;
+    
 	
 	// data
     Scene               scene;
@@ -40,18 +41,34 @@ public:
 	// settings
 	ofMatrix4x4			vtCalib, dirCalib;
 	ofVec3f				calibOrigin, calibAxisX, calibAlt;
-    int                 numSampleFrames;
+    int                 sampleFramesMin, sampleFramesMax;
     bool                windowOnTop;
 	bool				showRawPose;
 	bool				enableAutoCam;
     float               autoCamDistance;
+    float               baseHeight;
 	int					currentFrame;
+    bool                showImGui;
 	
 	// status
 	ofMatrix4x4			vtRawPose, vtPose;
+    ofVec3f             vtPos, vtRot;
+    float               vtSpeed;
 	bool				trackerVisible = false;
 	
 	// gui
-	ofxImGui::Gui		gui;
+    ofxImGui::Gui		gui;
+    stringstream        ss;
+    ofTrueTypeFont      font;
+    
+    Graph               yawGraph, pitchGraph, speedGraph, yGraph;
+    
+    ofMesh              dirMesh, dirActiveMesh, camHeightMesh;
+    
+    struct {
+        ofImage         img;
+        int             lastModified = 0;
+        string          path;
+    } guide;
 
 };

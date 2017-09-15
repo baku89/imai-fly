@@ -2,13 +2,16 @@
 
 #include "ofxAdvancedXmlSettings.h"
 #include "ofBaku.h"
-
+#include "ImOf.h"
 #include "WindowUtils.h"
+
+#define GUIDE_STEP 20
 
 //--------------------------------------------------------------
 void ofApp::setup(){
-	
-	ofEnableSmoothing();
+    
+    ofEnableSmoothing();
+    ofEnableAlphaBlending();
 	ofBackground(20, 20, 20);
 	
 	oscVt.setup(8000);
@@ -17,6 +20,10 @@ void ofApp::setup(){
 	grabCam.setFixUpDirectionEnabled(true);
 	grabCam.setPosition(.5, .5, 1);
 	grabCam.lookAt(ofVec3f());
+    grabCam.setLensOffset(ofVec2f(0, -1.0 / 3));
+    grabCam.setNearClip(0.001);
+    grabCam.setFarClip(10.0);
+    grabCam.setScrollZoomEnabled(true);
 
 	
 	calibOrigin.set(0, 0, 0);
@@ -24,7 +31,34 @@ void ofApp::setup(){
 	calibAlt.set(0, 0, 1);
 	
 	// setup gui
+    ImOf::SetFont();
 	gui.setup();
+    ImOf::SetStyle();
+    
+    font.load("FiraCode-Regular.ttf", 16);
+    
+    yawGraph.setColor(ofColor(0, 255, 255));
+    pitchGraph.setColor(ofColor(255, 0, 0));
+    yGraph.setColor(ofColor(0, 255, 0));
+    speedGraph.setColor(ofColor(255, 255, 0));
+    
+    yawGraph.setMarginY(10, 10);
+    pitchGraph.setMarginY(10, 10);
+    yGraph.setMarginY(.2, .2);
+    speedGraph.setMarginY(0, .1);
+    
+    dirMesh.setMode(OF_PRIMITIVE_LINES);
+    dirMesh.addVertex(ofVec3f(0, 0, 0));
+    dirMesh.addVertex(ofVec3f(0, 0, 0.15));
+    dirMesh.addColor(ofFloatColor(.5, .5, .5, 1));
+    dirMesh.addColor(ofFloatColor(.5, .5, .5, 0));
+    
+    dirActiveMesh.setMode(OF_PRIMITIVE_LINES);
+    dirActiveMesh.addVertices(dirMesh.getVertices());
+    dirActiveMesh.addColor(ofFloatColor(1, 0, 1, 1));
+    dirActiveMesh.addColor(ofFloatColor(1, 0, 1, 0));
+    
+    camHeightMesh.setMode(OF_PRIMITIVE_LINES);
 	
 	// load settings
 	ofxAdvancedXmlSettings settings;
@@ -34,9 +68,13 @@ void ofApp::setup(){
 	
 	enableAutoCam    = settings.getValue("enableAutoCam", false);
     autoCamDistance  = settings.getValue("autoCamDistance", 1.0);
-    numSampleFrames  = settings.getValue("numSampleFrames", 10);
+    sampleFramesMin  = settings.getValue("sampleFramesMin", -30);
+    sampleFramesMax  = settings.getValue("sampleFramesMax", 0);
+    baseHeight       = settings.getValue("baseHeight", 0.0);
     windowOnTop      = settings.getValue("windowOnTop", true);
 	showRawPose      = settings.getValue("showRawPose", false);
+    showImGui        = settings.getValue("showImGui", true);
+    
     currentFrame     = settings.getValue("currentFrame", 0);
     currentSceneName = settings.getValue("currentSceneName", "");
 	
@@ -47,23 +85,37 @@ void ofApp::setup(){
 	vtCalib		= settings.getValue("vtCalib", ofMatrix4x4());
 	dirCalib	= settings.getValue("dirCalib", ofMatrix4x4());
     
+    ofPoint windowPos = settings.getValue("windowPos", ofVec2f(ofGetWindowPositionX(), ofGetWindowPositionY()));
+    ofPoint windowSize = settings.getValue("windowSize", ofGetWindowSize());
+    
+    ofSetWindowPosition(windowPos.x, windowPos.y);
+    ofSetWindowShape(windowSize.x, windowSize.y);
+
     
     WindowUtils::setTitlebarTransparent(true);
     WindowUtils::setWindowOnTop(windowOnTop);
 	
     scene.load(currentSceneName);
+    guide.path = "/Users/baku/Dropbox/fly_guide/" + currentSceneName + ".png";
 }
 
 //--------------------------------------------------------------
 void ofApp::exit() {
 	
 	ofxAdvancedXmlSettings settings;
+    
+    settings.setValue("windowPos", ofVec2f(ofGetWindowPositionX(), ofGetWindowPositionY()));
+    settings.setValue("windowSize", ofGetWindowSize());
 	
 	settings.setValue("enableAutoCam", enableAutoCam);
     settings.setValue("autoCamDistance", autoCamDistance);
-    settings.setValue("numSampleFrames", numSampleFrames);
+    settings.setValue("sampleFramesMin", sampleFramesMin);
+    settings.setValue("sampleFramesMax", sampleFramesMax);
+    settings.setValue("baseHeight", baseHeight);
     settings.setValue("windowOnTop", windowOnTop);
 	settings.setValue("showRawPose", showRawPose);
+    settings.setValue("showImGui", showImGui);
+    
 	settings.setValue("currentSceneName", scene.getName());
 	settings.setValue("currentFrame", currentFrame);
 	
@@ -82,7 +134,7 @@ void ofApp::exit() {
 //--------------------------------------------------------------
 void ofApp::update(){
     
-    scene.setDuration(currentFrame);
+    scene.setDuration(currentFrame + 1);
 	
 	while (oscVt.hasWaitingMessages()) {
 		
@@ -118,16 +170,26 @@ void ofApp::update(){
 		} else if (address == "/vivetracker/visible") {
 			
 			trackerVisible = m.getArgAsBool(0);
-		}
+        }
 	}
-	
-	vtPose = dirCalib * (vtRawPose * vtCalib);
     
-    FrameData *fd = scene.get(currentFrame);
-    fd->pos = vtPose.getTranslation();
-    fd->rot = vtPose.getRotate().getEuler();
-    fd->empty = false;
-	
+    static FrameData *fd, *prevFd;
+    
+    prevFd = scene.getPrev(currentFrame);
+    
+	vtPose = dirCalib * (vtRawPose * vtCalib);
+    vtPos = vtPose.getTranslation();
+    vtRot = vtPose.getRotate().getEuler();
+    vtSpeed = (vtPos - prevFd->pos).length();
+    
+    while (vtRot.y - prevFd->yaw() > 180) {
+        vtRot.y -= 360;
+    }
+    
+    while (vtRot.y - prevFd->yaw() < -180) {
+        vtRot.y += 360;
+    }
+    
 	while (oscDf.hasWaitingMessages()) {
 		
 		ofxOscMessage m;
@@ -142,6 +204,14 @@ void ofApp::update(){
 		sceneName = m.getArgAsString(1);
         
         scene.setDuration(frame);
+        
+        // TODO: Fix some issue
+        if (scene.getName() != sceneName) {
+            scene.save();
+            scene.load(sceneName);
+            
+            currentFrame = 1;
+        }
 		
 		if (address == "/dragonframe/position") {
 			
@@ -150,15 +220,10 @@ void ofApp::update(){
 		
 		} else if (address == "/dragonframe/shoot") {
 			
-            // TODO: Fix some issue
-            if (scene.getName() != sceneName) {
-                scene.save();
-                scene.load(sceneName);
-            }
-			
             FrameData *fd = scene.get(frame);
-			fd->pos.set(vtPose.getTranslation());
-			fd->rot.set(vtPose.getRotate().getEuler());
+			fd->pos = vtPose.getTranslation();
+            fd->rot = vtRot;
+            fd->speed = vtSpeed;
 			fd->empty = false;
 			
 		} else if (address == "/dragonframe/cc") {
@@ -172,33 +237,41 @@ void ofApp::update(){
 		} else if (address == "/dragonframe/conform") {
 			
             scene.confirm();
-		}
+
+        } else if (address == "/dragonframe/delete") {
+            
+            scene.get(frame)->empty = true;
+        }
 	}
+    
+    // check if the guide image has updated
+    {
+        static int lm;
+        if (filesystem::exists(guide.path)) {
+            lm = filesystem::last_write_time(guide.path);
+            
+            if (lm != guide.lastModified) {
+                guide.lastModified = lm;
+                guide.img.load(guide.path);
+                ofLogNotice() << "Guide Image has updated";
+            }
+        }
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
 	
-	static ofPolyline camSpline, yawGraph, pitchGraph, yGraph;
+    static ofPolyline camSpline;
     
     // get prev frame data
     static FrameData* prevFd;
     
-    prevFd = scene.get(currentFrame);
+    prevFd = scene.getPrev(currentFrame);
     
-    for (int f = currentFrame - 1; f >= 1; f--) {
-        if (!scene.get(f)->empty) {
-            prevFd = scene.get(f);
-            break;
-        }
-    }
-	
-	ofPushStyle();
-	ofEnableAlphaBlending();
-	
-	if (enableAutoCam) {
-		
-		// get prev position
+    if (enableAutoCam) {
+        
+        // get prev position
         static ofVec3f      prevPos;
         prevPos = prevFd->pos;
         
@@ -206,24 +279,32 @@ void ofApp::draw() {
         rp = grabCam.getGlobalTransformMatrix().getRotate() * ofVec3f(0, 0, autoCamDistance);
         
         grabCam.setPosition(prevPos + rp);
-        grabCam.begin();
-        
     }
+    
+	
+	ofPushStyle();
+	
+    grabCam.begin();
 	
 	ofDisableDepthTest();
-	ofPushMatrix();
-	{
-		ofRotateZ(90);
-		ofSetColor(64);
-		ofDrawGridPlane(0.1f, 30.0f, false);
-		
-		ofSetColor(128);
-		ofDrawGridPlane(1.0f, 3.0f, true);
-	}
-	ofPopMatrix();
+    ofPushMatrix();
+    {
+        ofTranslate(ofPoint(0, baseHeight));
+        ofPushMatrix();
+        {
+            ofRotateZ(90);
+            ofSetColor(64);
+            ofDrawGridPlane(0.05f, 60.0f, false);
+            
+            ofSetColor(128);
+            ofDrawGridPlane(1.0f, 3.0f, false);
+        }
+        ofPopMatrix();
 	
-	ofSetLineWidth(2);
-	ofDrawAxis(1.0f);
+        ofSetLineWidth(2);
+        ofDrawAxis(1.0f);
+    }
+    ofPopMatrix();
 	ofEnableDepthTest();
 	
 	if (showRawPose) { ofPushMatrix(); ofMultMatrix(vtCalib.getInverse()); }
@@ -259,104 +340,150 @@ void ofApp::draw() {
 		// draw spline
 		
 		camSpline.clear();
+        camHeightMesh.clear();
+        
 		yawGraph.clear();
 		pitchGraph.clear();
-        
-        // calc scale of each graphs
-        static float prevYaw, prevPitch, yawScale, pitchScale;
-        
-        prevYaw = prevFd->rot.y;
-        prevPitch = prevFd->rot.x;
-        
-        yawScale = 10.0;
-        pitchScale = 10.0;
-        
-        static int numFrames;
-        numFrames = 0;
-        
-        for (int f = currentFrame - 1; f >= 1; f--) {
-            FrameData *fd = scene.get(f);
-            
-            if (!fd->empty) {
-                yawScale = max(yawScale, abs(fd->yaw() - prevYaw) * 2);
-                pitchScale = max(pitchScale, abs(fd->pitch() - prevPitch) * 2);
-            }
-            
-            if (++numFrames == numSampleFrames) {
-                break;
-            }
-        }
-        
-        yawScale += 5.0;
-        pitchScale += 5.0;
+        yGraph.clear();
+        speedGraph.clear();
         
 		ofSetColor(255);
-        
-        float gxStep = (float)ofGetWidth() / (numSampleFrames + 1);
 		
-		for (int f = 1; f <= scene.getDuration(); f++) {
-			FrameData *fd = scene.get(f);
+		for (int f = 0; f < scene.getDuration(); f++) {
+            
+            static ofVec3f  pos, rot;
+            static float    speed;
+            
+			FrameData       *fd = scene.get(f);
+            bool            isCurrentFrame = f == currentFrame;
+            bool            isInSampleRange = currentFrame + sampleFramesMin <= f && f <= currentFrame + sampleFramesMax;
 			
-			if (fd->empty) {
+			if (!isCurrentFrame && fd->empty) {
 				continue;
 			}
+            
+            if (isCurrentFrame) {
+                pos = vtPos;
+                rot = vtRot;
+                speed = vtSpeed;
+            } else {
+                pos = fd->pos;
+                rot = fd->rot;
+                speed = fd->speed;
+            }
 			
-			ofPushMatrix(); ofTranslate(fd->pos);
-            ofRotateY(fd->rot.y); ofRotateX(fd->rot.x); ofRotateZ(fd->rot.z);
+			ofPushMatrix(); ofTranslate(pos);
+            ofRotateY(rot.y); ofRotateX(rot.x); ofRotateZ(rot.z);
 			{
-                ofSetColor(255);
-				ofDrawSphere(0, 0, 0, 0.005);
+                if (isCurrentFrame) ofSetColor(255, 0, 255);
+                else if (fd == prevFd) ofSetColor(201, 136, 97);
+                else ofSetColor(255);
+
+				ofDrawSphere(0, 0, 0, 0.0025);
                 
-                ofSetColor(150);
+                if (isCurrentFrame) dirActiveMesh.draw();
+                else dirMesh.draw();
                 
-                ofDrawBitmapString(ofToString(f), 0.0, 0.01, 0.0);
-                ofDrawLine(ofVec3f(), ofVec3f(0, 0, 0.15));
+                if (isInSampleRange) {
+                    ofDrawBitmapString(ofToString(f), 0.0, 0.01, 0.0);
+                }
+                
 			}
 			ofPopMatrix();
 			
-			camSpline.addVertex(fd->pos);
+			camSpline.addVertex(pos);
+            
+            camHeightMesh.addVertex(pos);
+            camHeightMesh.addVertex(ofVec3f(pos.x, baseHeight, pos.z));
 			
 			// add graph
-            float gx = gxStep * (f - (currentFrame - numSampleFrames));
-			float vh = ofGetHeight();
-            
-            float yawY = 1.0 - ((fd->yaw() - prevYaw) / yawScale + 0.5);
-            float pitchY = 1.0 - ((fd->pitch() - prevPitch) / pitchScale + 0.5);
-            
-			yawGraph.addVertex(gx, vh * yawY);
-			pitchGraph.addVertex(gx, vh * pitchY);
+            if (isInSampleRange) {
+                yawGraph.addValue(f,    rot.y,  !isCurrentFrame);
+                pitchGraph.addValue(f,  rot.x,  !isCurrentFrame);
+                yGraph.addValue(f,      pos.y,  !isCurrentFrame);
+                speedGraph.addValue(f,  speed,  !isCurrentFrame);
+            }
 			
 		}
 		
 		ofSetColor(255);
 		camSpline.draw();
+        
+        ofSetColor(0, 64, 128);
+        camHeightMesh.draw();
 		
 	}
 	if (showRawPose) { ofPopMatrix(); }
 	
-    if (enableAutoCam) {
-        grabCam.end();
-    } else {
-        grabCam.end();
+    grabCam.end();
+    
+    // draw HUD
+    {
+        static float vw, vh, xmin, xmax, ct, cx;
+        static ofRectangle rect;
+        
+        vw = ofGetWidth();
+        vh = ofGetHeight();
+        
+        rect.set(0, 0, ofGetWidth(), ofGetHeight());
+        
+        xmin = currentFrame + sampleFramesMin;
+        xmax = currentFrame + sampleFramesMax;
+        
+        // draw playbar
+        ct = (currentFrame - xmin) / (xmax - xmin);
+        cx = rect.getMinX() + rect.width * ct;
+        ofPushStyle();
+        ofSetColor(255, 0, 0);
+        ofSetLineWidth(3);
+        ofDrawLine(cx, 0, cx, ofGetHeight());
+        ofPopStyle();
+        
+        // draw graph
+        yawGraph.setRangeX(xmin, xmax);
+        pitchGraph.setRangeX(xmin, xmax);
+        yGraph.setRangeX(xmin, xmax);
+        speedGraph.setRangeX(xmin, xmax);
+        
+        yawGraph.draw(rect);
+        pitchGraph.draw(rect);
+        yGraph.draw(rect);
+        
+        rect.scaleHeight(0.5);
+        rect.translateY(rect.height);
+        
+        speedGraph.draw(rect);
+        
+        
+        // guide image
+        if (guide.img.isAllocated()) {
+            
+            static float step, scale;
+            
+            step = vw / (xmax - xmin);
+            scale = step / GUIDE_STEP;
+            
+            ofSetColor(255, 255, 255, 128);
+            ofEnableBlendMode(OF_BLENDMODE_ADD);
+            
+            ofPushMatrix();
+            ofScale(scale, 1);
+            ofTranslate(-xmin * GUIDE_STEP, 0);
+            
+            guide.img.draw(0, 0);
+            
+            ofPopMatrix();
+            ofPopStyle();
+        }
     }
-	
-	ofSetColor(0, 255, 0);
-	yawGraph.draw();
-	for (auto& pt : yawGraph.getVertices()) {
-		ofDrawCircle(pt, 4);
-	}
-	
-	ofSetColor(255, 0, 0);
-	pitchGraph.draw();
-	for (auto& pt : pitchGraph.getVertices()) {
-		ofDrawCircle(pt, 4);
-	}
-	
+    
 	// visible?
+    /*
 	if (!trackerVisible) {
 		ofSetColor(255, 0, 0, 128);
 		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 	}
+     */
 	
 	ofPopStyle();
 	
@@ -365,117 +492,178 @@ void ofApp::draw() {
 
 //--------------------------------------------------------------
 void ofApp::drawImGui() {
+    
+    if (showImGui) {
 	
-	
-	static bool calibPtChanged;
-	calibPtChanged = false;
-	
-	
-	gui.begin();
-	
-	ImGui::Text("Scene: %s", scene.getName().c_str());
-	ImGui::Text("Current Frame: %s", ofToString(currentFrame).c_str());
-	
-    if (ImGui::Checkbox("Window on Top", &windowOnTop)) {
-        WindowUtils::setWindowOnTop(windowOnTop);
+        static bool calibPtChanged;
+        calibPtChanged = false;
         
-    }
-	
-	ImGui::Checkbox("Show Raw Pose", &showRawPose);
-    
-    if (ImGui::Checkbox("Enable Auto Cam", &enableAutoCam)) {
-        if (!enableAutoCam) {
-            ofLogNotice() << "Disabled auto cam";
-            grabCam.setTransformMatrix(autoCam.getGlobalTransformMatrix());
+        static bool p_open = true;
+        
+        gui.begin();
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::Begin("Control", &p_open, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
+        
+        ImGui::SliderFloat("Cam Distance", &autoCamDistance, 0.1, 2.0);
+        
+        ImGui::DragIntRange2("Sample Frames", &sampleFramesMin, &sampleFramesMax, 1, -120, 120, "%.f");
+        
+        if (ImGui::Button("Confirm Manually")) {
+            scene.confirm();
         }
+        
+        if (ImGui::Checkbox("Window on Top", &windowOnTop)) {
+            WindowUtils::setWindowOnTop(windowOnTop);
+        }
+        
+        ImGui::Checkbox("Show Raw Pose", &showRawPose);
+        
+        ImGui::Checkbox("Enable Auto Cam", &enableAutoCam);
+        
+        if (ImGui::TreeNode("Calibration")) {
+            
+            ImGui::SliderFloat("Base Height", &baseHeight, -1, 1);
+        
+            if (ImGui::Button("Set Origin")) {
+                
+                calibOrigin = vtRawPose.getTranslation();
+                calibPtChanged = true;
+            }
+            
+            ImGui::SameLine();
+            
+            if (ImGui::Button("Set Axis X")) {
+                
+                calibAxisX = vtRawPose.getTranslation();
+                calibPtChanged = true;
+            }
+            
+            ImGui::SameLine();
+            
+            if (ImGui::Button("Set Alt")) {
+                
+                calibAlt = vtRawPose.getTranslation();
+                calibPtChanged = true;
+            }
+            
+            
+            static ofMatrix4x4 vtOffset;
+            
+            if (calibPtChanged) {
+                
+                // init
+                vtOffset.set(1, 0, 0, 0,
+                             0, 1, 0, 0,
+                             0, 0, 1, 0,
+                             0, 0, 0, 1);
+                
+                ofVec3f axisX = (calibAxisX - calibOrigin).normalize();
+                ofVec3f axisZ = (calibAlt - calibOrigin).normalize();
+                ofVec3f axisY = axisZ.getCrossed(axisX).normalize();
+                
+                axisZ = axisX.getCrossed(axisY).normalize();
+                
+                vtOffset._mat[0].set(axisX);
+                vtOffset._mat[1].set(axisY);
+                vtOffset._mat[2].set(axisZ);
+                
+                vtOffset.setTranslation(calibOrigin);
+                
+                vtCalib.makeInvertOf(vtOffset);
+            }
+            
+            ImGui::SameLine();
+            
+            if (ImGui::Button("Set Direction")) {
+                
+                ofMatrix4x4 vtDir, camDir, zInv;
+                
+                zInv.makeRotationMatrix(180, ofVec3f(0, 1, 0));
+                
+                vtDir.set(vtRawPose);
+                
+                camDir.makeLookAtMatrix(vtDir.getTranslation(),			// eye
+                                        ofVec3f(),						// center
+                                        -vtRawPose.getRowAsVec3f(2));	// up vector
+                
+                dirCalib = zInv * (camDir * vtDir.getInverse());
+            }
+            
+            ImGui::TreePop();
+        }
+        
+        ImGui::End();
+        
+        gui.end();
     }
     
-    ImGui::SliderFloat("Auto Cam Distance", &autoCamDistance, 0.1, 2.0);
+    static string frameInfo;
+    static ofRectangle rect;
     
-    ImGui::SliderInt("Sample Frames", &numSampleFrames, 1, 60);
-	
-	
-	if (ImGui::Button("Confirm Manually")) {
-		
-        scene.confirm();
-	}
-	
-	if (ImGui::TreeNode("Calibration")) {
-	
-		if (ImGui::Button("Set Origin")) {
-			
-			calibOrigin = vtRawPose.getTranslation();
-			calibPtChanged = true;
-		}
-		
-		if (ImGui::Button("Set Axis X")) {
-			
-			calibAxisX = vtRawPose.getTranslation();
-			calibPtChanged = true;
-		}
-		
-		if (ImGui::Button("Set Alt")) {
-			
-			calibAlt = vtRawPose.getTranslation();
-			calibPtChanged = true;
-		}
-		
-		
-		static ofMatrix4x4 vtOffset;
-		
-		if (calibPtChanged) {
-			
-			// init
-			vtOffset.set(1, 0, 0, 0,
-						 0, 1, 0, 0,
-						 0, 0, 1, 0,
-						 0, 0, 0, 1);
-			
-			ofVec3f axisX = (calibAxisX - calibOrigin).normalize();
-			ofVec3f axisZ = (calibAlt - calibOrigin).normalize();
-			ofVec3f axisY = axisZ.getCrossed(axisX).normalize();
-			
-			axisZ = axisX.getCrossed(axisY).normalize();
-			
-			vtOffset._mat[0].set(axisX);
-			vtOffset._mat[1].set(axisY);
-			vtOffset._mat[2].set(axisZ);
-			
-			vtOffset.setTranslation(calibOrigin);
-			
-			vtCalib.makeInvertOf(vtOffset);
-		}
-		
-		if (ImGui::Button("Set Direction")) {
-			
-			ofMatrix4x4 vtDir, camDir, zInv;
-			
-			zInv.makeRotationMatrix(180, ofVec3f(0, 1, 0));
-			
-			vtDir.set(vtRawPose);
-			
-			camDir.makeLookAtMatrix(vtDir.getTranslation(),			// eye
-									ofVec3f(),						// center
-									-vtRawPose.getRowAsVec3f(2));	// up vector
-			
-			dirCalib = zInv * (camDir * vtDir.getInverse());
-		}
-		
-		ImGui::TreePop();
-	}
-	
-	
-	gui.end();
+    frameInfo = scene.getName() + " - " + ofToString(currentFrame, 4, '0');
+    
+    rect = font.getStringBoundingBox(frameInfo, 0, 0);
+    rect.x = ofGetWidth() / 2 - rect.width / 2;
+    rect.y = ofGetHeight() - rect.height - 5;
+    
+    ofSetColor(255);
+    font.drawString(frameInfo, rect.x, rect.y);
 }
 
 //--------------------------------------------------------------
 void ofApp::keyPressed(int key){
 
+    
+    float angle = 4;
+    
+    switch (key) {
+
+        case '4':
+            grabCam.rotate(-angle, 0, 1, 0);
+            break;
+        case '6':
+            grabCam.rotate(+angle, 0, 1, 0);
+            break;
+        case '8':
+            grabCam.rotate(-angle, grabCam.getXAxis());
+            break;
+        case '2':
+            grabCam.rotate(+angle, grabCam.getXAxis());
+            break;
+        case '7':
+            autoCamDistance /= 1.05;
+            if (autoCamDistance < .1) {
+                autoCamDistance = .1;
+            }
+            break;
+        case '0':
+            scene.confirm();
+            break;
+        case '1':
+            autoCamDistance *= 1.05;
+            break;
+//        case '-':
+//            numSampleFrames = max(1, numSampleFrames - 1);
+//            break;
+//        case '+':
+//            numSampleFrames = min(60, numSampleFrames + 1);
+//            break;
+    }
 }
 
 //--------------------------------------------------------------
 void ofApp::keyReleased(int key){
 
+    switch (key) {
+        case 'h':
+        case '.':
+            showImGui = !showImGui;
+            break;
+        case 'm':
+            scene.confirm();
+            break;
+            
+    }
 }
 
 //--------------------------------------------------------------
