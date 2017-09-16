@@ -60,6 +60,7 @@ public:
     ofxImGui::Gui		gui;
     stringstream        ss;
     ofTrueTypeFont      font;
+    ofSoundPlayer       warnSound;
     
     Graph               yawGraph, pitchGraph, speedGraph, yGraph;
     

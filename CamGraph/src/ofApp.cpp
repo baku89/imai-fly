@@ -39,6 +39,8 @@ void ofApp::setup(){
     
     font.load("FiraCode-Regular.ttf", 16);
     
+    warnSound.load("beep.wav");
+    
     yawGraph.setColor(ofColor(0, 255, 255));
     pitchGraph.setColor(ofColor(255, 0, 0));
     yGraph.setColor(ofColor(0, 255, 0));
@@ -229,6 +231,10 @@ void ofApp::update(){
 			fd->empty = false;
             
             scene.save(true);
+            
+            if (!trackerVisible) {
+                warnSound.play();
+            }
 			
 		} else if (address == "/dragonframe/cc") {
 			
