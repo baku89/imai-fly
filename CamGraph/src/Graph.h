@@ -56,6 +56,15 @@ public:
         xmax = _xmax;
     }
     
+    void setRangeY(const float &_ymin, const float &_ymax) {
+        ymin = _ymin;
+        ymax = _ymax;
+    }
+    
+    float getMaxY() {
+        return ymax;
+    }
+    
     void draw(const ofRectangle &rect) {
         
         ofSetColor(color);

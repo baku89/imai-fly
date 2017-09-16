@@ -30,21 +30,21 @@ class ViveTracker:
 
 		while(True):
 			start = time.time()
-
-			#pose = self.v.devices[key].get_pose_euler()
+			
 			pose = self.v.devices[key].get_pose_quaternion()
 
 			# send osc
 			x, y, z, qx, qy, qz, qw = pose
+			visible = not (x == 0 and y == 0 and z == 0)
 
 			self.client.send_message("/vivetracker/position", [x, y, z])
 			self.client.send_message("/vivetracker/quaternion", [qx, qy, qz, qw])
-			self.client.send_message("/vivetracker/visible", not (x == 0 and y == 0 and z == 0))
+			self.client.send_message("/vivetracker/visible", visible)
 
 			# print
 			txt = ""
-			for val in pose:
-				txt += ("%.4f" % val) + " "
+			for val in [x, y, z]:
+				txt += ("%.2f" % (val * 100)) + " "
 			print("\r" + txt, end="")
 
 			# sleep

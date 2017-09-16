@@ -67,7 +67,7 @@ public:
     
     struct {
         ofImage         img;
-        int             lastModified = 0;
+        int             lastModified = -1;
         string          path;
     } guide;
 

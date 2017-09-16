@@ -100,7 +100,7 @@ public:
         }
     }
     
-    void save() {
+    void save(bool saveAsBackup = false) {
         
         // save Scene
         ofxAdvancedXmlSettings sceneSettings;
@@ -126,10 +126,18 @@ public:
         
         sceneSettings.setValue("dirPath", dirPath);
         
-        sceneSettings.save("scenes/scene_" + name + ".xml");
+        string path;
+        
+        if (saveAsBackup) {
+            path = "scenes/backups/scenes_" + name + "_" + ofGetTimestampString() + ".xml";
+        } else {
+            path = "scenes/scene_" + name + ".xml";
+        }
+        
+        sceneSettings.save(path);
     }
     
-    void confirm() {
+    void conform() {
         
         ofDirectory sceneDir(dirPath);
         
@@ -137,11 +145,12 @@ public:
             return;
         }
         
-        // TODO: Add RAW extensions
-        sceneDir.allowExt("png");
-        sceneDir.allowExt("jpg");
-        sceneDir.allowExt("tiff");
+        // create backup
+        this->save(true);
         
+        // TODO: Add RAW extensions
+        //sceneDir.allowExt("jpg");
+        sceneDir.allowExt("cr2");
         
         sceneDir.listDir();
         vector<ofFile> files = sceneDir.getFiles();
@@ -164,16 +173,14 @@ public:
             string filePath = file.getAbsolutePath();
             
             string seqStr	= baseName.substr(baseName.length() - 4);
-            int fnum		= ofToInt(seqStr);
+            int frame		= ofToInt(seqStr);
             
             string hash		= ofGetFileHash(filePath);
             
-            while (data.size() < fnum - 1) {
-                data.push_back(new FrameData());
-            }
+            this->setDuration(frame + 1);
             
             if (frameMap[hash]) {
-                data.push_back(frameMap[hash]);
+                data[frame] = frameMap[hash];
             } else {
                 ofLogNotice() << "sortCurrentScene(): Invalid hash found.";
             }

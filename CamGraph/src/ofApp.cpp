@@ -5,14 +5,16 @@
 #include "ImOf.h"
 #include "WindowUtils.h"
 
+#define GUIDE_PATH "/Users/baku/Dropbox/fly_guide/"
+
 #define GUIDE_STEP 20
 
 //--------------------------------------------------------------
 void ofApp::setup(){
     
-    ofEnableSmoothing();
+    //ofEnableSmoothing();
     ofEnableAlphaBlending();
-	ofBackground(20, 20, 20);
+    ofBackground(0);
 	
 	oscVt.setup(8000);
 	oscDf.setup(1234);
@@ -20,7 +22,7 @@ void ofApp::setup(){
 	grabCam.setFixUpDirectionEnabled(true);
 	grabCam.setPosition(.5, .5, 1);
 	grabCam.lookAt(ofVec3f());
-    grabCam.setLensOffset(ofVec2f(0, -1.0 / 3));
+    grabCam.setLensOffset(ofVec2f(0, -0.5));
     grabCam.setNearClip(0.001);
     grabCam.setFarClip(10.0);
     grabCam.setScrollZoomEnabled(true);
@@ -42,8 +44,8 @@ void ofApp::setup(){
     yGraph.setColor(ofColor(0, 255, 0));
     speedGraph.setColor(ofColor(255, 255, 0));
     
-    yawGraph.setMarginY(10, 10);
-    pitchGraph.setMarginY(10, 10);
+    yawGraph.setMarginY(3, 3);
+    pitchGraph.setMarginY(3, 3);
     yGraph.setMarginY(.2, .2);
     speedGraph.setMarginY(0, .1);
     
@@ -90,13 +92,11 @@ void ofApp::setup(){
     
     ofSetWindowPosition(windowPos.x, windowPos.y);
     ofSetWindowShape(windowSize.x, windowSize.y);
-
-    
     WindowUtils::setTitlebarTransparent(true);
     WindowUtils::setWindowOnTop(windowOnTop);
-	
+
     scene.load(currentSceneName);
-    guide.path = "/Users/baku/Dropbox/fly_guide/" + currentSceneName + ".png";
+    guide.path = GUIDE_PATH + currentSceneName + ".png";
 }
 
 //--------------------------------------------------------------
@@ -209,6 +209,8 @@ void ofApp::update(){
         if (scene.getName() != sceneName) {
             scene.save();
             scene.load(sceneName);
+            guide.path = GUIDE_PATH + sceneName + ".png";
+            guide.lastModified = -1;
             
             currentFrame = 1;
         }
@@ -225,6 +227,8 @@ void ofApp::update(){
             fd->rot = vtRot;
             fd->speed = vtSpeed;
 			fd->empty = false;
+            
+            scene.save(true);
 			
 		} else if (address == "/dragonframe/cc") {
 			
@@ -236,7 +240,7 @@ void ofApp::update(){
 			
 		} else if (address == "/dragonframe/conform") {
 			
-            scene.confirm();
+            scene.conform();
 
         } else if (address == "/dragonframe/delete") {
             
@@ -252,6 +256,7 @@ void ofApp::update(){
             
             if (lm != guide.lastModified) {
                 guide.lastModified = lm;
+                guide.img.allocate(256, 256, OF_IMAGE_COLOR_ALPHA);
                 guide.img.load(guide.path);
                 ofLogNotice() << "Guide Image has updated";
             }
@@ -263,10 +268,9 @@ void ofApp::update(){
 void ofApp::draw() {
 	
     static ofPolyline camSpline;
-    
-    // get prev frame data
     static FrameData* prevFd;
     
+    // get prev frame data
     prevFd = scene.getPrev(currentFrame);
     
     if (enableAutoCam) {
@@ -280,7 +284,6 @@ void ofApp::draw() {
         
         grabCam.setPosition(prevPos + rp);
     }
-    
 	
 	ofPushStyle();
 	
@@ -294,15 +297,17 @@ void ofApp::draw() {
         {
             ofRotateZ(90);
             ofSetColor(64);
-            ofDrawGridPlane(0.05f, 60.0f, false);
+            ofDrawGridPlane(0.2f, 15.0f, false);
             
             ofSetColor(128);
             ofDrawGridPlane(1.0f, 3.0f, false);
         }
         ofPopMatrix();
-	
+        
+        ofPushStyle();
         ofSetLineWidth(2);
         ofDrawAxis(1.0f);
+        ofPopStyle();
     }
     ofPopMatrix();
 	ofEnableDepthTest();
@@ -418,21 +423,28 @@ void ofApp::draw() {
     grabCam.end();
     
     // draw HUD
+    ofPushMatrix();
+    ofTranslate(0, ofGetHeight() / 2);
     {
         static float vw, vh, xmin, xmax, ct, cx;
         static ofRectangle rect;
         
         vw = ofGetWidth();
-        vh = ofGetHeight();
+        vh = ofGetHeight() / 2;
         
-        rect.set(0, 0, ofGetWidth(), ofGetHeight());
+        rect.set(0, 0, vw, vh);
         
         xmin = currentFrame + sampleFramesMin;
         xmax = currentFrame + sampleFramesMax;
         
+        // fill black
+        ofSetColor(0, 0, 0);
+        ofDrawRectangle(rect);
+        
         // draw playbar
         ct = (currentFrame - xmin) / (xmax - xmin);
         cx = rect.getMinX() + rect.width * ct;
+        
         ofPushStyle();
         ofSetColor(255, 0, 0);
         ofSetLineWidth(3);
@@ -444,14 +456,11 @@ void ofApp::draw() {
         pitchGraph.setRangeX(xmin, xmax);
         yGraph.setRangeX(xmin, xmax);
         speedGraph.setRangeX(xmin, xmax);
+        speedGraph.setRangeY(0, .3);
         
         yawGraph.draw(rect);
         pitchGraph.draw(rect);
         yGraph.draw(rect);
-        
-        rect.scaleHeight(0.5);
-        rect.translateY(rect.height);
-        
         speedGraph.draw(rect);
         
         
@@ -463,11 +472,11 @@ void ofApp::draw() {
             step = vw / (xmax - xmin);
             scale = step / GUIDE_STEP;
             
-            ofSetColor(255, 255, 255, 128);
-            ofEnableBlendMode(OF_BLENDMODE_ADD);
+            ofEnableBlendMode(OF_BLENDMODE_SCREEN);
+            ofSetColor(255, 255, 255, 192);
             
             ofPushMatrix();
-            ofScale(scale, 1);
+            ofScale(scale, vh / guide.img.getHeight());
             ofTranslate(-xmin * GUIDE_STEP, 0);
             
             guide.img.draw(0, 0);
@@ -476,14 +485,13 @@ void ofApp::draw() {
             ofPopStyle();
         }
     }
+    ofPopMatrix();
     
-	// visible?
-    /*
+	// visible
 	if (!trackerVisible) {
 		ofSetColor(255, 0, 0, 128);
 		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 	}
-     */
 	
 	ofPopStyle();
 	
@@ -506,10 +514,17 @@ void ofApp::drawImGui() {
         
         ImGui::SliderFloat("Cam Distance", &autoCamDistance, 0.1, 2.0);
         
+        ImGui::SliderFloat("Base Height", &baseHeight, -1, 1);
+        
         ImGui::DragIntRange2("Sample Frames", &sampleFramesMin, &sampleFramesMax, 1, -120, 120, "%.f");
         
+        
         if (ImGui::Button("Confirm Manually")) {
-            scene.confirm();
+            scene.conform();
+        }
+        
+        if (ImGui::Button("Save Backup")) {
+            scene.save(true);
         }
         
         if (ImGui::Checkbox("Window on Top", &windowOnTop)) {
@@ -521,8 +536,6 @@ void ofApp::drawImGui() {
         ImGui::Checkbox("Enable Auto Cam", &enableAutoCam);
         
         if (ImGui::TreeNode("Calibration")) {
-            
-            ImGui::SliderFloat("Base Height", &baseHeight, -1, 1);
         
             if (ImGui::Button("Set Origin")) {
                 
@@ -606,7 +619,7 @@ void ofApp::drawImGui() {
     rect.x = ofGetWidth() / 2 - rect.width / 2;
     rect.y = ofGetHeight() - rect.height - 5;
     
-    ofSetColor(255);
+    ofSetColor(255, 255, 255, 128);
     font.drawString(frameInfo, rect.x, rect.y);
 }
 
@@ -637,7 +650,7 @@ void ofApp::keyPressed(int key){
             }
             break;
         case '0':
-            scene.confirm();
+            scene.conform();
             break;
         case '1':
             autoCamDistance *= 1.05;
@@ -660,7 +673,7 @@ void ofApp::keyReleased(int key){
             showImGui = !showImGui;
             break;
         case 'm':
-            scene.confirm();
+            scene.conform();
             break;
             
     }
