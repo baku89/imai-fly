@@ -62,7 +62,14 @@ public:
     ofTrueTypeFont      font;
     ofSoundPlayer       warnSound;
     
-    Graph               yawGraph, pitchGraph, speedGraph, yGraph;
+    
+    struct {
+        Graph yaw;
+        Graph pitch;
+        Graph roll;
+        Graph speed;
+        Graph y;
+    } graph;
     
     ofMesh              dirMesh, dirActiveMesh, camHeightMesh;
     

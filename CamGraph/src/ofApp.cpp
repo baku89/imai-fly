@@ -41,15 +41,17 @@ void ofApp::setup(){
     
     warnSound.load("beep.wav");
     
-    yawGraph.setColor(ofColor(0, 255, 255));
-    pitchGraph.setColor(ofColor(255, 0, 0));
-    yGraph.setColor(ofColor(0, 255, 0));
-    speedGraph.setColor(ofColor(255, 255, 0));
+    graph.yaw.setColor(ofColor(0, 255, 255));
+    graph.pitch.setColor(ofColor(255, 0, 0));
+    graph.roll.setColor(ofColor(128, 0, 255));
+    graph.y.setColor(ofColor(0, 255, 0));
+    graph.speed.setColor(ofColor(255, 255, 0));
     
-    yawGraph.setMarginY(3, 3);
-    pitchGraph.setMarginY(3, 3);
-    yGraph.setMarginY(.2, .2);
-    speedGraph.setMarginY(0, .1);
+    graph.yaw.setMarginY(3, 3);
+    graph.pitch.setMarginY(3, 3);
+    graph.roll.setMarginY(3, 3);
+    graph.y.setMarginY(.2, .2);
+    graph.speed.setMarginY(0, .1);
     
     dirMesh.setMode(OF_PRIMITIVE_LINES);
     dirMesh.addVertex(ofVec3f(0, 0, 0));
@@ -353,10 +355,11 @@ void ofApp::draw() {
 		camSpline.clear();
         camHeightMesh.clear();
         
-		yawGraph.clear();
-		pitchGraph.clear();
-        yGraph.clear();
-        speedGraph.clear();
+		graph.yaw.clear();
+		graph.pitch.clear();
+        graph.roll.clear();
+        graph.y.clear();
+        graph.speed.clear();
         
 		ofSetColor(255);
 		
@@ -409,10 +412,11 @@ void ofApp::draw() {
 			
 			// add graph
             if (isInSampleRange) {
-                yawGraph.addValue(f,    rot.y,  !isCurrentFrame);
-                pitchGraph.addValue(f,  rot.x,  !isCurrentFrame);
-                yGraph.addValue(f,      pos.y,  !isCurrentFrame);
-                speedGraph.addValue(f,  speed,  !isCurrentFrame);
+                graph.yaw.addValue(f,    rot.y,  !isCurrentFrame);
+                graph.pitch.addValue(f,  rot.x,  !isCurrentFrame);
+                graph.roll.addValue(f,   rot.z,  !isCurrentFrame);
+                graph.y.addValue(f,      pos.y,  !isCurrentFrame);
+                graph.speed.addValue(f,  speed,  !isCurrentFrame);
             }
 			
 		}
@@ -458,16 +462,18 @@ void ofApp::draw() {
         ofPopStyle();
         
         // draw graph
-        yawGraph.setRangeX(xmin, xmax);
-        pitchGraph.setRangeX(xmin, xmax);
-        yGraph.setRangeX(xmin, xmax);
-        speedGraph.setRangeX(xmin, xmax);
-        speedGraph.setRangeY(0, .3);
+        graph.yaw.setRangeX(xmin, xmax);
+        graph.pitch.setRangeX(xmin, xmax);
+        graph.roll.setRangeX(xmin, xmax);
+        graph.y.setRangeX(xmin, xmax);
+        graph.speed.setRangeX(xmin, xmax);
+        graph.speed.setRangeY(0, .3);
         
-        yawGraph.draw(rect);
-        pitchGraph.draw(rect);
-        yGraph.draw(rect);
-        speedGraph.draw(rect);
+        graph.yaw.draw(rect);
+        graph.pitch.draw(rect);
+        graph.roll.draw(rect);
+        graph.y.draw(rect);
+        graph.speed.draw(rect);
         
         
         // guide image
@@ -494,10 +500,10 @@ void ofApp::draw() {
     ofPopMatrix();
     
 	// visible
-	if (!trackerVisible) {
-		ofSetColor(255, 0, 0, 128);
-		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
-	}
+//	if (!trackerVisible) {
+//		ofSetColor(255, 0, 0, 128);
+//		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
+//	}
 	
 	ofPopStyle();
 	
