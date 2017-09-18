@@ -9,6 +9,8 @@
 
 #define GUIDE_STEP 20
 
+#define SCENE_STARTFRAME 314
+
 //--------------------------------------------------------------
 void ofApp::setup(){
     
@@ -47,11 +49,13 @@ void ofApp::setup(){
     graph.y.setColor(ofColor(0, 255, 0));
     graph.speed.setColor(ofColor(255, 255, 0));
     
-    graph.yaw.setMarginY(3, 3);
-    graph.pitch.setMarginY(3, 3);
-    graph.roll.setMarginY(3, 3);
+    const float angleMargin = 15;
+    
+    graph.yaw.setMarginY(angleMargin, angleMargin);
+    graph.pitch.setMarginY(angleMargin, angleMargin);
+    graph.roll.setMarginY(angleMargin, angleMargin);
     graph.y.setMarginY(.2, .2);
-    graph.speed.setMarginY(0, .1);
+    graph.speed.setMarginY(0, 0);
     
     dirMesh.setMode(OF_PRIMITIVE_LINES);
     dirMesh.addVertex(ofVec3f(0, 0, 0));
@@ -461,6 +465,30 @@ void ofApp::draw() {
         ofDrawLine(cx, 0, cx, ofGetHeight());
         ofPopStyle();
         
+        // guide image
+        if (guide.img.isAllocated()) {
+            
+            static float step, scale;
+            
+            step = vw / (xmax - xmin);
+            scale = step / GUIDE_STEP;
+            
+            ofEnableBlendMode(OF_BLENDMODE_SCREEN);
+            ofEnableAlphaBlending();
+            ofSetColor(255, 255, 255, 210);
+            
+            ofPushMatrix();
+            ofScale(scale, vh / guide.img.getHeight());
+            ofTranslate((-xmin + SCENE_STARTFRAME) * GUIDE_STEP, 0);
+            
+            guide.img.draw(0, 0);
+            
+            ofPopMatrix();
+            
+            ofDisableAlphaBlending();
+            ofPopStyle();
+        }
+        
         // draw graph
         graph.yaw.setRangeX(xmin, xmax);
         graph.pitch.setRangeX(xmin, xmax);
@@ -475,35 +503,14 @@ void ofApp::draw() {
         graph.y.draw(rect);
         graph.speed.draw(rect);
         
-        
-        // guide image
-        if (guide.img.isAllocated()) {
-            
-            static float step, scale;
-            
-            step = vw / (xmax - xmin);
-            scale = step / GUIDE_STEP;
-            
-            ofEnableBlendMode(OF_BLENDMODE_SCREEN);
-            ofSetColor(255, 255, 255, 192);
-            
-            ofPushMatrix();
-            ofScale(scale, vh / guide.img.getHeight());
-            ofTranslate(-xmin * GUIDE_STEP, 0);
-            
-            guide.img.draw(0, 0);
-            
-            ofPopMatrix();
-            ofPopStyle();
-        }
     }
     ofPopMatrix();
     
 	// visible
-//	if (!trackerVisible) {
-//		ofSetColor(255, 0, 0, 128);
-//		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
-//	}
+	if (!trackerVisible) {
+		ofSetColor(255, 0, 0, 128);
+		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
+	}
 	
 	ofPopStyle();
 	
@@ -629,7 +636,7 @@ void ofApp::drawImGui() {
     
     rect = font.getStringBoundingBox(frameInfo, 0, 0);
     rect.x = ofGetWidth() / 2 - rect.width / 2;
-    rect.y = ofGetHeight() - rect.height - 5;
+    rect.y = ofGetHeight() - rect.height + 16;
     
     ofSetColor(255, 255, 255, 128);
     font.drawString(frameInfo, rect.x, rect.y);

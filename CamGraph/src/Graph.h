@@ -2,8 +2,6 @@
 
 #include "ofMain.h"
 
-#include <limits>
-
 class Plot {
 public:
     Plot(float _x, float _y) : x(_x), y(_y) {
@@ -28,8 +26,8 @@ public:
     void clear() {
         data.clear();
         
-        float minValue = numeric_limits<float>::max();
-        float maxValue = numeric_limits<float>::min();
+        float minValue = +1000000;
+        float maxValue = -1000000;
         
         xmin = minValue;
         xmax = maxValue;
@@ -77,14 +75,13 @@ public:
         for (auto plot : data) {
             float x = rect.x + rect.width  * getRatio(plot.x, xmin, xmax);
             float y = rect.y + rect.height * getRatio(plot.y, ymax, ymin);
+
             shape.addVertex(x, y);
             ofDrawCircle(x, y, 3);
         }
         
         shape.draw();
     }
-    
-    
     
 private:
                                        
@@ -98,7 +95,6 @@ private:
     vector<Plot> data;
     
     ofColor color;
-    
     float xmin, xmax, ymin, ymax;
     float yminMargin = 0, ymaxMargin = 0;
     

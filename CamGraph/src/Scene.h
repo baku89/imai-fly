@@ -113,6 +113,7 @@ public:
                 
                 sceneSettings.pushTag("frameData", i);
                 {
+                    sceneSettings.setValue("frame", i);
                     sceneSettings.setValue("empty", fd->empty);
                     sceneSettings.setValue("pos",	fd->pos);
                     sceneSettings.setValue("rot",	fd->rot);
