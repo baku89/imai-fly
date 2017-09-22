@@ -30,6 +30,13 @@ public:
 class Scene {
 public:
     
+    Scene() {        
+        // set start frame
+        startFrame["FLY_0I_01"] = 0;
+        startFrame["FLY_1A_01"] = 315;
+        startFrame["FLY_1H2_01"] = 1035;
+    }
+    
     string& getName() {
         return name;
     }
@@ -60,6 +67,14 @@ public:
         }
         
         return prevFd;
+    }
+    
+    int getStartFrame() {
+        if (startFrame.find(name) == startFrame.end()) {
+            return 0;
+        } else {
+            return startFrame[name];
+        }
     }
     
     void load(const string &_name) {
@@ -204,6 +219,8 @@ public:
 private:
     
     string name, dirPath;
-       vector<FrameData*> data;
+    vector<FrameData*> data;
+    
+    map<string, int> startFrame;
     
 };

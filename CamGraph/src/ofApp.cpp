@@ -9,8 +9,6 @@
 
 #define GUIDE_STEP 20
 
-#define SCENE_STARTFRAME 314
-
 //--------------------------------------------------------------
 void ofApp::setup(){
     
@@ -479,7 +477,7 @@ void ofApp::draw() {
             
             ofPushMatrix();
             ofScale(scale, vh / guide.img.getHeight());
-            ofTranslate((-xmin + SCENE_STARTFRAME) * GUIDE_STEP, 0);
+            ofTranslate((-xmin + scene.getStartFrame()) * GUIDE_STEP, 0);
             
             guide.img.draw(0, 0);
             
