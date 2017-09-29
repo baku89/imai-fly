@@ -10,7 +10,7 @@ class ViveTracker:
 
 	v = None
 
-	client = udp_client.SimpleUDPClient("192.168.1.9", 8000)
+	client = udp_client.SimpleUDPClient("192.168.1.10", 8000)
 
 	def init(self):
 		try:
@@ -31,7 +31,11 @@ class ViveTracker:
 		while(True):
 			start = time.time()
 			
-			pose = self.v.devices[key].get_pose_quaternion()
+			try: # avoid halting when zero division occurs
+				pose = self.v.devices[key].get_pose_quaternion()
+			except Exception as e:
+				continue
+
 
 			# send osc
 			x, y, z, qx, qy, qz, qw = pose
