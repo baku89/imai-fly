@@ -32,9 +32,20 @@ public:
     
     Scene() {        
         // set start frame
-        startFrame["FLY_0I_01"] = 0;
-        startFrame["FLY_1A_01"] = 315;
+        startFrame["FLY_0I_01"]  = 0;
+        startFrame["FLY_1A_01"]  = 315;
         startFrame["FLY_1H2_01"] = 1035;
+        startFrame["FLY_2A2_01"] = 1333;
+        
+        startFrame["FLY_2B1_01"] = 1487;
+        startFrame["FLY_2B2_01"] = 1626;
+        startFrame["FLY_2H1_01"] = 1775;
+        startFrame["FLY_2H2_01"] = 2077;
+        startFrame["FLY_2F1_01"] = 2520;
+        startFrame["FLY_2F2_01"] = 2554;
+        startFrame["FLY_2F3_01"] = 2588;
+        startFrame["FLY_4O_01"]  = 2621;
+        
     }
     
     string& getName() {
