@@ -1,8 +1,15 @@
-# PSEP - Fly
+# imai - Fly feat. 79, Kaho Nakamura
+
+![](./thumbs/camgraph.png)
+![](./thumbs/fly_camgraph_2h2.jpg)
+
+[MV本編](https://www.youtube.com/watch?v=iQi3aMQXip8) | [撮影風景](https://www.youtube.com/watch?v=dXoeCv-BxJw)
+
+ほぼそのままアップしただけでして、非常に雑です。とりあえずこの撮影で使えれば良かったので、僕の環境以外動きません。
 
 ## Applications
 
- - CamGraph: Working with Dragonframe, this app visualizes how the camera has moved.
+ - CamGraph: Working with Dragonframe, this app visualizes how the camera has moved. Built with oF 0.9.8.
  - dragonframe-osc: Notify Dragonframe's events as OSC.
  - tracker2osc: Send a coordinate of Vive Tracker as OSC.
 

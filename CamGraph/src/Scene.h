@@ -38,12 +38,13 @@ public:
         startFrame["FLY_2A2_01"] = 1333;
         
         startFrame["FLY_2B1_01"] = 1487;
-        startFrame["FLY_2B2_01"] = 1626;
+        startFrame["FLY_2B2_01"] = 1627;
         startFrame["FLY_2H1_01"] = 1775;
         startFrame["FLY_2H2_01"] = 2077;
-        startFrame["FLY_2F1_01"] = 2520;
-        startFrame["FLY_2F2_01"] = 2554;
-        startFrame["FLY_2F3_01"] = 2588;
+        
+        startFrame["FLY_4F1_01"] = 2520;
+        startFrame["FLY_4F2_01"] = 2554;
+        startFrame["FLY_4F3_01"] = 2588;
         startFrame["FLY_4O_01"]  = 2621;
         
     }

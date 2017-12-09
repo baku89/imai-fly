@@ -7,6 +7,7 @@
 
 #include "Scene.h"
 #include "Graph.h"
+#include "RadialDolly.h"
 
 class ofApp : public ofBaseApp{
 
@@ -34,6 +35,7 @@ public:
 	ofxGrabCam			grabCam;
 	ofxOscReceiver		oscVt, oscDf;
     
+    RadialDolly         radialDolly;
 	
 	// data
     Scene               scene;

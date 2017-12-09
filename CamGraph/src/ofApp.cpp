@@ -31,6 +31,8 @@ void ofApp::setup(){
 	calibOrigin.set(0, 0, 0);
 	calibAxisX.set(1, 0, 0);
 	calibAlt.set(0, 0, 1);
+    
+    radialDolly.setup();
 	
 	// setup gui
     ImOf::SetFont();
@@ -96,6 +98,8 @@ void ofApp::setup(){
     ofPoint windowPos = settings.getValue("windowPos", ofVec2f(ofGetWindowPositionX(), ofGetWindowPositionY()));
     ofPoint windowSize = settings.getValue("windowSize", ofGetWindowSize());
     
+    radialDolly.loadSettings(settings);
+    
     ofSetWindowPosition(windowPos.x, windowPos.y);
     ofSetWindowShape(windowSize.x, windowSize.y);
     WindowUtils::setTitlebarTransparent(true);
@@ -131,6 +135,8 @@ void ofApp::exit() {
 	
 	settings.setValue("vtCalib", vtCalib);
 	settings.setValue("dirCalib", dirCalib);
+    
+    radialDolly.saveSettings(settings);
 	
 	settings.save("settings.xml");
 	
@@ -272,6 +278,8 @@ void ofApp::update(){
             }
         }
     }
+    
+    radialDolly.update(vtPos, currentFrame);
 }
 
 //--------------------------------------------------------------
@@ -363,6 +371,8 @@ void ofApp::draw() {
         graph.y.clear();
         graph.speed.clear();
         
+        radialDolly.graph.clear();
+        
 		ofSetColor(255);
 		
 		for (int f = 0; f < scene.getDuration(); f++) {
@@ -419,6 +429,8 @@ void ofApp::draw() {
                 graph.roll.addValue(f,   rot.z,  !isCurrentFrame);
                 graph.y.addValue(f,      pos.y,  !isCurrentFrame);
                 graph.speed.addValue(f,  speed,  !isCurrentFrame);
+                
+                radialDolly.addGraphValue(f, pos, !isCurrentFrame);
             }
 			
 		}
@@ -428,6 +440,8 @@ void ofApp::draw() {
         
         ofSetColor(0, 64, 128);
         camHeightMesh.draw();
+        
+        radialDolly.draw();
 		
 	}
 	if (showRawPose) { ofPopMatrix(); }
@@ -501,14 +515,18 @@ void ofApp::draw() {
         graph.y.draw(rect);
         graph.speed.draw(rect);
         
+        radialDolly.drawGraph(rect, xmin, xmax);
+        
     }
     ofPopMatrix();
     
 	// visible
+    /*
 	if (!trackerVisible) {
 		ofSetColor(255, 0, 0, 128);
 		ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 	}
+     */
 	
 	ofPopStyle();
 	
@@ -621,6 +639,8 @@ void ofApp::drawImGui() {
             
             ImGui::TreePop();
         }
+        
+        radialDolly.drawImGui();
         
         ImGui::End();
         
